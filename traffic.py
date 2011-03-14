@@ -12,6 +12,13 @@ import re
 import logging
 import random
 
+haveIPAddrGen = False
+try:
+    import ipaddrgen
+    haveIPAddrGen = True
+except:
+    pass
+
 
 class GeneratorNode(object):
     def __init__(self, sim, srcnode):
@@ -49,6 +56,11 @@ class SimpleGeneratorNode(GeneratorNode):
         # print ipsrc,ipdst
         self.ipsrc = ipaddr.IPNetwork(ipsrc)
         self.ipdst = ipaddr.IPNetwork(ipdst)
+        if haveIPAddrGen:
+            self.ipsrcgen = ipaddrgen.initialize_trie(int(self.ipsrc), self.ipsrc.prefixlen, 0.61)
+            self.ipdstgen = ipaddrgen.initialize_trie(int(self.ipdst), self.ipdst.prefixlen, 0.61)
+
+
         self.sport = self.dport = None
         self.icmptype = self.icmpcode = None
         self.autoack = False
@@ -153,8 +165,13 @@ class SimpleGeneratorNode(GeneratorNode):
 
 
     def __makeflow(self):
-        srcip = str(ipaddr.IPAddress(int(self.ipsrc) + random.randint(0,self.ipsrc.numhosts-1)))
-        dstip = str(ipaddr.IPAddress(int(self.ipdst) + random.randint(0,self.ipdst.numhosts-1)))
+        if haveIPAddrGen:
+            srcip = str(ipaddr.IPv4Address(ipaddrgen.generate_addressv4(self.ipsrcgen)))
+            dstip = str(ipaddr.IPv4Address(ipaddrgen.generate_addressv4(self.ipdstgen)))
+        else:
+            srcip = str(ipaddr.IPAddress(int(self.ipsrc) + random.randint(0,self.ipsrc.numhosts-1)))
+            dstip = str(ipaddr.IPAddress(int(self.ipdst) + random.randint(0,self.ipdst.numhosts-1)))
+
         ipproto = self.ipproto
         sport = dport = 0
         if ipproto == socket.IPPROTO_ICMP:
@@ -275,6 +292,9 @@ class HarpoonGeneratorNode(GeneratorNode):
         GeneratorNode.__init__(self, sim, srcnode)
         self.srcnet = ipaddr.IPNetwork(ipsrc)
         self.dstnet = ipaddr.IPNetwork(ipdst)
+        if haveIPAddrGen:
+            self.ipsrcgen = ipaddrgen.initialize_trie(int(self.srcnet), self.srcnet.prefixlen, 0.61)
+            self.ipdstgen = ipaddrgen.initialize_trie(int(self.dstnet), self.dstnet.prefixlen, 0.61)
 
         if isinstance(ipproto, str):
             self.ipproto = eval(ipproto)
@@ -573,8 +593,12 @@ class HarpoonGeneratorNode(GeneratorNode):
     
     def __makeflow(self):
         while True:
-            srcip = str(ipaddr.IPAddress(int(self.srcnet) + random.randint(0,self.srcnet.numhosts-1)))
-            dstip = str(ipaddr.IPAddress(int(self.dstnet) + random.randint(0,self.dstnet.numhosts-1)))
+            if haveIPAddrGen:
+                srcip = str(ipaddr.IPv4Address(ipaddrgen.generate_addressv4(self.ipsrcgen)))
+                dstip = str(ipaddr.IPv4Address(ipaddrgen.generate_addressv4(self.ipdstgen)))
+            else:
+                srcip = str(ipaddr.IPAddress(int(self.srcnet) + random.randint(0,self.srcnet.numhosts-1)))
+                dstip = str(ipaddr.IPAddress(int(self.dstnet) + random.randint(0,self.dstnet.numhosts-1)))
             ipproto = next(self.ipproto)
             sport = next(self.srcports)
             dport = next(self.dstports)

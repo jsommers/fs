@@ -64,8 +64,11 @@ class SimpleGeneratorNode(GeneratorNode):
         self.sport = self.dport = None
         self.icmptype = self.icmpcode = None
         self.autoack = False
-        if autoack:
+        if autoack and isinstance(autoack, str):
             self.autoack = eval(autoack)
+        else:
+            self.autoack = autoack
+
         try:
             self.ipproto = int(ipproto)
         except:
@@ -81,9 +84,10 @@ class SimpleGeneratorNode(GeneratorNode):
         if not iptos:
             self.iptos = randomchoice(0x0)
         else:
-            self.iptos = eval(iptos)
-            if isinstance(self.iptos, int):
+            if isinstance(iptos, int):
                 self.iptos = randomchoice(self.iptos)
+            elif isinstance(iptos, str):
+                self.iptos = eval(iptos)
    
         if self.ipproto == socket.IPPROTO_ICMP:
             xicmptype = xicmpcode = 0
@@ -118,7 +122,10 @@ class SimpleGeneratorNode(GeneratorNode):
         self.continuous = None
         self.nflowlets = None
         if continuous:
-            self.continuous = eval(continuous)
+            if isinstance(continuous, str):
+                self.continuous = eval(continuous)
+            else:
+                self.continuous = continuous
 
         if flowlets:
             self.nflowlets = eval(flowlets)
@@ -497,7 +504,9 @@ class HarpoonGeneratorNode(GeneratorNode):
             #print 'etca',etca
             #print 'etdelack',etdelack
             #print 'entire estimated time',flowduration
-            assert(flowduration >= basertt)
+
+            # assert(flowduration >= basertt)
+            flowduration = max(flowduration, basertt)
 
             csa00bw = flet.size / flowduration
             if test:

@@ -7,7 +7,14 @@ import heapq
 import sys
 import ipaddr
 import networkx
-from networkx.algorithms.traversal.path import single_source_dijkstra_path, dijkstra_path_length
+try:
+    from networkx.algorithms.traversal.path import single_source_dijkstra_path, dijkstra_path_length
+except:
+    from networkx.algorithms.shortest_paths.weighted import single_source_dijkstra_path, dijkstra_path_length
+else:
+    print >>sys.stderr,"Can't find the necessary dijkstra's functions in your networkx installation.  You should probably upgrade to a more recent version."
+    sys.exit(-1)
+
 import pydot
 import random
 import signal

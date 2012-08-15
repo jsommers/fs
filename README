@@ -1,4 +1,30 @@
-==========================================================================
+# FS: a network flow record generator
+
+FS is a network flow record generator.  It contains a discrete event
+simulation core to generate the flow records, and relies on existing 
+TCP throughput models to drive the simulation.
+
+FS is made available under terms of the GPLv2.
+
+# Building fs
+
+FS is implemented in Python and has a few external module dependencies:
+
+To use fs, you need the following Python packages:
+ * ipaddr (2.1.1)
+ * networkx (1.0)
+ * pydot (1.0.2)
+ * pyparsing (1.5.2)
+ * pytricia (also can use py-radix 0.5)
+
+Versions above indicate those that I've tested with.  
+
+Pytricia is my own code, also available on github.  It's faster than existing
+Python modules for doing IP lookup, and as a bonus is Py3k compatible.
+
+Better documentation will be added as time permits.
+
+----------
 
 Copyright 2011  Joel Sommers.  All rights reserved.
 
@@ -15,18 +41,6 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Harpoon; if not, write to the Free Software
+along with fs; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-==========================================================================
-
-Documentation placeholder :-)
-
-To use fs, you need the following Python packages:
-- ipaddr (2.1.1)
-- networkx (1.0)
-- pydot (1.0.2)
-- pyparsing (1.5.2)
-- py-radix (0.5)
-
-Versions indicate those that I've tested with.

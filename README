@@ -11,16 +11,18 @@ FS is made available under terms of the GPLv2.
 FS is implemented in Python and has a few external module dependencies:
 
 To use fs, you need the following Python packages:
- * ipaddr (2.1.1)
- * networkx (1.0)
- * pydot (1.0.2)
- * pyparsing (1.5.2)
- * pytricia (also can use py-radix 0.5)
+ * ipaddr 
+ * networkx 
+ * pydot 
+ * pyparsing 
+ * pytricia (py-radix is no longer supported)
 
-Versions above indicate those that I've tested with.  
+To install all the above, see the requirements.txt file here and use pip:
 
-Pytricia is my own code, also available on github.  It's faster than existing
-Python modules for doing IP lookup, and as a bonus is Py3k compatible.
+    pip install -r requirements.txt
+
+I'd recommend using virtualenv, then installing the packages using
+pip, inside a given venv.  See http://pypi.python.org/pypi/virtualenv.
 
 Better documentation will be added as time permits.
 

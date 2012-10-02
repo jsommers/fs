@@ -2,7 +2,6 @@
 
 __author__ = 'jsommers@colgate.edu'
 
-# import cProfile as profile
 import heapq
 import sys
 import ipaddr
@@ -19,11 +18,10 @@ import pydot
 import random
 import signal
 import socket
-import radix
 import logging
 from optparse import OptionParser
-# import gc
 
+from pytricia import PyTricia
 from flowlet import *
 from traffic import *
 from flowexport import *
@@ -148,8 +146,7 @@ class Simulator(object):
             for n,d in self.graph.nodes_iter(data=True):
                 print n,d
 
-        self.ipdestlpm = radix.Radix()
-        # self.ipdestlist = []
+        self.ipdestlpm = PyTricia()
         for n,d in self.graph.nodes_iter(data=True):
             dlist = d['ipdests'].split(' ')
             if self.debug:
@@ -157,13 +154,13 @@ class Simulator(object):
             for destipstr in dlist:
                 destipstr = destipstr.replace('"','')
                 ipnet = ipaddr.IPNetwork(destipstr)
-                # self.ipdestlist.append( (ipnet, n) )
-                xnode = self.ipdestlpm.add(str(ipnet))
-                if 'dests' in xnode.data:
-                    xnode.data['dests'].append(n)
+                xnode = {}
+                self.ipdestlpm[str(ipnet)] = xnode
+                if 'dests' in xnode:
+                    xnode['dests'].append(n)
                 else:
-                    xnode.data['net'] = ipnet
-                    xnode.data['dests'] = [ n ]
+                    xnode['net'] = ipnet
+                    xnode['dests'] = [ n ]
 
         self.owdhash = {}
         for a in self.graph:
@@ -413,10 +410,10 @@ class Simulator(object):
         returns: destination node name
         '''
         # radix trie lpm lookup for destination IP prefix
-        xnode = self.ipdestlpm.search_best(dest)
+        xnode = self.ipdestlpm.get(dest, None)
 
         if xnode:
-            dlist = xnode.data['dests']
+            dlist = xnode['dests']
             best = None
             if len(dlist) > 1: 
                 # in the case that there are multiple egress nodes

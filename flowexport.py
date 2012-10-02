@@ -11,7 +11,7 @@ from cflow import cflow
 
 class FlowExporter(object):
     def __init__(self, rname):
-        self.routername = rname
+        self.routername = str(rname)
 
     def exportflow(self, ts, flet):
         pass

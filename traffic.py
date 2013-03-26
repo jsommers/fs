@@ -3,6 +3,7 @@
 __author__ = 'jsommers@colgate.edu'
 
 from flowlet import *
+from fsutil import *
 import ipaddr
 import math
 import copy
@@ -11,6 +12,8 @@ import socket
 import re
 import logging
 import random
+import pdb
+from pox.lib.addresses import EthAddr 
 
 haveIPAddrGen = False
 try:
@@ -19,6 +22,22 @@ try:
 except:
     pass
 
+def get_mac_addr(ipAddr):
+    mac = ''
+    num = 0
+    for i in range(len(ipAddr)):
+        if ipAddr[i].isdigit():
+            num += 1
+            mac += ipAddr[i]
+            if num % 2 == 0:
+                mac += ':'
+    while num < 12:
+        mac += '0'
+        num += 1
+        if num != 12 and num % 2 == 0:
+            mac += ':'
+    mac = ''.join(reversed(mac))
+    return mac
 
 class GeneratorNode(object):
     def __init__(self, sim, srcnode):
@@ -195,7 +214,11 @@ class SimpleGeneratorNode(GeneratorNode):
             if self.dport:
                 dport = next(self.dport)
                 
-        flet = Flowlet(FiveTuple(srcip, dstip, ipproto, sport, dport))
+        # Creating src and dst mac addresses
+        srcmac = get_mac_addr(srcip)
+        dstmac = get_mac_addr(dstip)
+
+        flet = Flowlet(FlowIdent(srcip, dstip, ipproto, sport, dport, srcmac, dstmac))
         flet.iptos = next(self.iptos)
 
         if flet.ipproto == socket.IPPROTO_TCP:
@@ -240,7 +263,7 @@ class SimpleGeneratorNode(GeneratorNode):
         else:
             f.pkts = next(self.pkts)
 
-        self.sim.router(self.srcnode).flowlet_arrival(f, 'rawgen', destnode)
+        self.sim.node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode)
         ticks -= 1
         self.sim.after(xinterval, 'rawflow-flowemit-'+str(self.srcnode), self.flowemit, flowlet, destnode, xinterval, ticks)
 
@@ -283,7 +306,7 @@ class SimpleGeneratorNode(GeneratorNode):
         # print 'xinterval',xinterval
 
         if not ticks or ticks == 1:
-            self.sim.router(self.srcnode).flowlet_arrival(f, 'rawgen', destnode)
+            self.sim.node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode)
         else:
             self.sim.after(0, 'rawflow-flowemit-'+str(self.srcnode), self.flowemit, f, destnode, xinterval, ticks)
       
@@ -586,8 +609,8 @@ class HarpoonGeneratorNode(GeneratorNode):
 
 
         # print '0x%0x flags' % (fsend.tcpflags)
-        self.sim.router(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode)
-        
+        self.sim.node(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode)
+
         # if there are more flowlets, schedule the next one
         if flowlet.bytes > 0:
             self.sim.after(self.sim.interval, 'flowemit-'+str(self.srcnode), self.flowemit, flowlet, numsent, emitrv, destnode)
@@ -606,24 +629,26 @@ class HarpoonGeneratorNode(GeneratorNode):
                 srcip = str(ipaddr.IPv4Address(ipaddrgen.generate_addressv4(self.ipsrcgen)))
                 dstip = str(ipaddr.IPv4Address(ipaddrgen.generate_addressv4(self.ipdstgen)))
             else:
-                srcip = str(ipaddr.IPAddress(int(self.srcnet) + random.randint(0,self.srcnet.numhosts-1)))
-                dstip = str(ipaddr.IPAddress(int(self.dstnet) + random.randint(0,self.dstnet.numhosts-1)))
+                # srcip = str(ipaddr.IPAddress(int(self.srcnet) + random.randint(0,self.srcnet.numhosts-1)))
+                # dstip = str(ipaddr.IPAddress(int(self.dstnet) + random.randint(0,self.dstnet.numhosts-1)))
+                srcip = str(ipaddr.IPAddress(int(self.srcnet) + random.randint(0, 2)))
+                dstip = str(ipaddr.IPAddress(int(self.dstnet) + random.randint(0, 2)))
+
             ipproto = next(self.ipproto)
             sport = next(self.srcports)
             dport = next(self.dstports)
             fsize = int(next(self.flowsizerv))
-            flet = Flowlet(FiveTuple(srcip, dstip, ipproto, sport, dport), bytes=fsize)
+            # Creating src and dst mac addresses
+            srcmac = get_mac_addr(srcip)
+            dstmac = get_mac_addr(dstip)
+            flet = Flowlet(FlowIdent(srcip, dstip, ipproto, sport, dport, srcmac, dstmac), 
+                           bytes=fsize)
+            
             flet.iptos = next(self.iptosrv)
             if flet.key not in self.activeflows:
                 break
 
         return flet
-
-
-def removeuniform(p):
-    while True:
-        yield (random.random() < p)
-
     
 class SubtractiveGeneratorNode(GeneratorNode):
     def __init__(self, sim, srcnode, dstnode=None, action=None, ipdstfilt=None,
@@ -652,9 +677,9 @@ class SubtractiveGeneratorNode(GeneratorNode):
     def callback(self):
         # pass oneself from srcnode to dstnode, performing action at each router
         # at end, set done to True
-        f = Flowlet(FiveTuple(self.ipsrcfilt, self.ipdstfilt, ipproto=self.ipprotofilt), xtype='subtractive', xdata=self.action)
+        f = SubtractiveFlowlet(FlowIdent(self.ipsrcfilt, self.ipdstfilt, ipproto=self.ipprotofilt), action=self.action)
         self.logger.info('Subtractive generator callback')
-        self.sim.router(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode)
+        self.sim.node(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode)
 
 
 class FlowEventGenModulator(object):
@@ -703,6 +728,10 @@ class FlowEventGenModulator(object):
         g = self.generator_generator()
         g.start()
         self.generators[g] = 1
+
+
+    def kill_all_generator(self):
+        self.__modulate(0)
 
 
     def kill_generator(self):
@@ -769,149 +798,10 @@ class FlowEventGenModulator(object):
             nexttime,sources = next(self.withdraw)
         except:
             self.logger.info('finished with withdraw phase')
-            pass
+            self.sim.after(0, 'modulator: kill_all', self.kill_all_generator)
         else:
             assert(sources>=0)
             self.__modulate(sources)
             self.logger.info('withdraw: %f %d' % (nexttime,sources))
             self.sim.after(nexttime, 'modulator: withdraw', self.withdraw_phase)
 
-
-def zipit(xtup):
-    assert(len(xtup) == 2)
-    a = list(xtup[0])
-    b = list(xtup[1])
-    if len(a) < len(b):
-        a = a * len(b)
-    a.insert(0,0)
-    b.insert(0,b[0])
-    # print 'zipit a',a
-    # print 'zipit b',b
-    # print 'xzip',zip(a,b)
-    mg = modulation_generator(zip(a,b))
-    return mg
-
-
-def frange(a, b, c):
-    xlist = []
-    if a < b:
-        assert (c > 0)
-        while a <= b:
-            xlist.append(a)
-            a += c
-        if a > b and xlist[-1] != b:
-            xlist.append(b)
-    else:
-        assert (c < 0)
-        while a >= b:
-            xlist.append(a)
-            a += c
-        if a < b and xlist[-1] != b:
-            xlist.append(b)
-    return xlist
-
-def modulation_generator(xlist):
-    for x in xlist:
-        yield x
-
-def randomunifint(lo, hi):
-    while True:
-        yield random.randint(lo, hi)
-
-def randomuniffloat(lo, hi):
-    while True:
-        yield random.random()*(hi-lo)+lo
-
-def randomchoice(*choices):
-    while True:
-        yield random.choice(choices)
-
-def randomchoicefile(infilename):
-    xlist = []
-    with open(infilename) as inf:
-        for line in inf:
-            for value in line.strip().split():
-                try:
-                    xlist.append(float(value))
-                except:
-                    pass
-    index = 0
-    while True:
-        yield xlist[index]
-        index = (index + 1) % len(xlist)
-
-def pareto(offset,alpha):
-    while True:
-        # yield offset*random.paretovariate(alpha)
-        yield (offset * ((1.0/math.pow(random.random(), 1.0/alpha)) - 1.0));
-
-#def mypareto(scale, shape):
-#    return (scale * ((1.0/math.pow(random.random(), 1.0/shape)) - 1.0));
-
-def exponential(lam):
-    while True:
-        yield random.expovariate(lam)
-
-def normal(mean, sdev):
-    while True:
-        yield random.normalvariate(mean, sdev)
-
-def lognormal(mean, sdev):
-    while True:
-        yield random.lognormvariate(mean, sdev)
-
-def gamma(alpha, beta):
-    while True:
-        yield random.gammavariate(alpha, beta)
-
-def weibull(alpha, beta):
-    while True:
-        yield random.weibullvariate(alpha, beta)
-
-def mkdict(s):
-    xdict = {}
-    if isinstance(s, str):
-        s = s.split()
-    for kvstr in s:
-        k,v = kvstr.split('=')
-        xdict[k] = v
-    return xdict
- 
-
-
-def main():
-    d1 = { 'ipsrc':'10.4.0.0/16', 'ipdst':'10.7.1.0/24', 'flowsize':'pareto(10000,1.2)', 'flowstart':'exponential(0.1)', 'pktsize':'randomunifint(1000,1500)', 'ipproto':'randomchoice(socket.IPPROTO_TCP)', 'dport':'randomchoice(22,80,443)', 'sport':'randomunifint(1025,65535)', 'emitprocess':'randomchoice(x)' }
-
-    d2 = 'ipsrc=10.2.0.0/16 ipdst=10.3.1.0/24 flowsize=pareto(50000,1.18) flowstart=exponential(0.5) pktsize=normal(1000,200) ipproto=randomchoice(6) dport=randomchoice(22,80,443) sport=randomunifint(1025,65535) lossrate=randomuniffloat(0.005,0.01) mss=randomchoice(1500,576,1500) emitprocess=normal(x,x*0.1) iptos=randomchoice(0x0,0x10,0x08,0x04,0x02)'
-
-    d3 = 'ipsrc=10.2.0.0/16 ipdst=10.3.1.0/24 flowsize=exponential(1.0/100000) flowstart=randomchoice(10) ipproto=randomchoice(6) dport=randomchoice(22,80,443) sport=randomunifint(1025,65535) lossrate=randomuniffloat(0.05,0.10)'
-
-    d3 = mkdict(d3)
-    harpoon = HarpoonGeneratorNode(None, 'test', tcpmodel='mathis', **d3)
-
-    flowlet,sent,emitrv,dnode = harpoon.newflow(test=True, xint=1.0)
-    preflowlet = copy.copy(flowlet)
-    print "prestuff",flowlet, sent, emitrv, dnode
-
-    accum = copy.copy(flowlet)
-    accum.bytes = 0
-    accum.pkts = 0
-    # print 'accumulator:',accum
-    i = 0
-    while flowlet.bytes > 0:
-        f,sent,emitrv,dnode = harpoon.flowemit(flowlet,sent,emitrv,dnode,test=True)
-        print 'flowemit',i,f
-        i += 1
-        accum = accum + f
-    print 'pre:',preflowlet
-    print 'done:',accum
-    print 'avg pkt accum:',accum.bytes/float(accum.pkts)
-
-
-    harpoon = HarpoonGeneratorNode(None, 'test', tcpmodel='csa00', **d3)
-    flowlet,sent,emitrv,dnode = harpoon.newflow(test=True, xint=1.0)
-    preflowlet = copy.copy(flowlet)
-    print "prestuff",flowlet, sent, emitrv, dnode
-        
-if __name__ == '__main__':
-    main()

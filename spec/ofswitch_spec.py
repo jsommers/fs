@@ -12,7 +12,7 @@ import copy
 class TestOfSwitch(unittest.TestCase):
     def setUp(self):
         self.mocksim = Mock()
-        self.mocksim.now = Mock(return_value=0)
+        self.mocksim.now = 0
         self.mconfig = Mock()
         self.mocknode = Mock()
         self.mocklink = Mock()
@@ -27,12 +27,14 @@ class TestOfSwitch(unittest.TestCase):
         controller_link = Mock()
         self.switch.link_table['controller'] = controller_link
         controller_link.flowlet_arrival = Mock(return_value=None)
+        self.mocksim.now = 1
         self.assertEqual(self.switch.flowlet_arrival(flowlet, "prev","next"),"controller")
         self.switch.match_table.assert_called_with(flowlet,"prev")
 
     def testFlowletArrHasTableEntry(self):
         flowlet = Flowlet(FlowIdent())
         self.switch.match_table = Mock(return_value="next")
+        self.mocksim.now = 1
         self.assertEqual(self.switch.flowlet_arrival(flowlet, "prev","next"), "next")
         self.switch.match_table.assert_called_with(flowlet, "prev")
         self.linkobj.flowlet_arrival.assert_called_with(flowlet, "test", "next")
@@ -62,7 +64,7 @@ class TestOfSwitch(unittest.TestCase):
         match_obj.tp_src = flowlet.srcport
         match_obj.tp_dst = flowlet.dstport
 
-        matcher = ofp_match_from_flowlet(flowlet)
+        matcher = ofp_match_from_flowlet(flowlet, ports=True)
         self.assertTrue(match_obj == matcher)
 
         match_obj = poxof.ofp_match()

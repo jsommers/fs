@@ -1,5 +1,7 @@
 graph test {
     // 3 nodes: a, b, and c
+    flowexportfn=text_export_factory
+
     a [ 
         autoack="False"
         ipdests="10.1.0.0/16 10.10.0.0/16 10.128.0.0/9"

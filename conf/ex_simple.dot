@@ -1,5 +1,15 @@
 graph test {
     // 3 nodes: a, b, and c
+    flowexportfn=text_export_factory
+    counterexportfile="counters"
+    flowsampling=1.0
+    pktsampling=1.0
+    exportcycle=60
+    counterexport=True
+    counterexportinterval=1
+    longflowtmo=60
+    flowinactivetmo=60
+
     a [ 
         autoack="False"
         ipdests="10.1.0.0/16"

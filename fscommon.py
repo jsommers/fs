@@ -9,14 +9,15 @@ def get_logger(debug=False):
     loglevel = logging.INFO
     if debug:
         loglevel = logging.DEBUG
-    logging.basicConfig(level=logging.DEBUG, format=log_format)
+    logging.basicConfig(level=loglevel, format=log_format)
     return logger
 
-__simobj = None
-def fscore():
-    return __simobj
 
-def set_fscore(simobj):
-    global __simobj
-    __simobj = simobj
+__obj = None
+def set_fscore(obj):
+    global __obj
+    __obj = obj
+
+def fscore():
+    return __obj
 

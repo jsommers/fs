@@ -34,19 +34,23 @@ class NullTopology(object):
         pass
 
 class Topology(NullTopology):
-    def __init__(self, graph):
+    def __init__(self, graph, routing, nodes, ipdestlpm, owdhash, traffic_modulators):
         self.logger = fscommon.get_logger()
         self.graph = graph
-        self.routing = None
-        self.nodes = None
-        self.ipdestlpm = None
-        self.owdhash = None
+        self.routing = routing
+        self.nodes = nodes
+        self.ipdestlpm = ipdestlpm
+        self.owdhash = owdhash
+        self.traffic_modulators = traffic_modulators
 
     def node(self, nname):
         '''get the node object corresponding to a name '''
         return self.nodes[nname]
 
     def start(self):
+        for tm in self.traffic_modulators:
+            tm.start()
+
         for nname,n in self.nodes.iteritems():
             n.start()
 
@@ -200,7 +204,7 @@ class FsConfigurator(object):
         self.__configure_routing()
         self.__configure_parallel_universe(measurement_config, measurement_nodes)
         self.__configure_traffic()
-        return self.graph, self.routing, self.nodes, self.ipdestlpm, self.owdhash
+        return Topology(self.graph, self.routing, self.nodes, self.ipdestlpm, self.owdhash, self.traffic_modulators)
 
     def __configure_edge_reliability(self, a, b, relistr, edict):
         relidict = mkdict(relistr.replace('"', '').strip())
@@ -268,7 +272,6 @@ class FsConfigurator(object):
                     owd += self.delay(rlist[i],rlist[i+1])
                 self.owdhash[key] = owd
 
-    ### FIXME: these three methods need to go bye-bye
     def delay(self, a, b):
         '''get the link delay between a and b '''
         d = self.graph[a][b]
@@ -370,7 +373,6 @@ class FsConfigurator(object):
 
                 self.logger.debug('Configing modulator: {}'.format(str(modspecstr)))
                 m = self.__configure_traf_modulator(modspecstr, n, d)
-                m.start()
                 self.traffic_modulators.append(m)
 
 

@@ -12,3 +12,11 @@ def get_logger(debug=False):
     logging.basicConfig(level=logging.DEBUG, format=log_format)
     return logger
 
+__simobj = None
+def fscore():
+    return __simobj
+
+def set_fscore(simobj):
+    global __simobj
+    __simobj = simobj
+

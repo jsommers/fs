@@ -3,8 +3,7 @@
 __author__ = 'jsommers@colgate.edu'
 
 import logging
-from fs import FsCore
-import fscommon
+from fscommon import *
 
 class Link(object):
     __slots__ = ['capacity','delay','egress_node','ingress_node','backlog','bdp','queuealarm','lastalarm','alarminterval','doqdelay','logger']
@@ -19,7 +18,7 @@ class Link(object):
         self.lastalarm = -1
         self.alarminterval = 30
         self.doqdelay = True
-        self.logger = fscommon.get_logger()
+        self.logger = get_logger()
 
     def decrbacklog(self, amt):
         self.backlog -= amt
@@ -31,9 +30,9 @@ class Link(object):
             queuedelay = max(0, (self.backlog - self.bdp) / self.capacity)
             wait += queuedelay
             self.backlog += flowlet.size 
-            if queuedelay > self.queuealarm and FsCore.sim.now - self.lastalarm > self.alarminterval:
-                self.lastalarm = FsCore.sim.now
+            if queuedelay > self.queuealarm and fscore().now - self.lastalarm > self.alarminterval:
+                self.lastalarm = fscore().now
                 self.logger.warn("Excessive backlog on link %s-%s (%f sec (%d bytes))" % (self.ingress_node.name, self.egress_node.name, queuedelay, self.backlog))
-            FsCore.sim.after(wait, 'link-decrbacklog-'+str(self.egress_node.name), self.decrbacklog, flowlet.size)
+            fscore().after(wait, 'link-decrbacklog-'+str(self.egress_node.name), self.decrbacklog, flowlet.size)
 
-        FsCore.sim.after(wait, 'link-flowarrival-'+str(self.egress_node.name), self.egress_node.flowlet_arrival, flowlet, prevnode, destnode)
+        fscore().after(wait, 'link-flowarrival-'+str(self.egress_node.name), self.egress_node.flowlet_arrival, flowlet, prevnode, destnode)

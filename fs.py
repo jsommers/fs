@@ -12,10 +12,13 @@ import configurator
 import fscommon
 
 class FsCore(object):
-    # FIXME: should make this a static property, non-modifiable
-    sim = None
+    inited = False
 
     def __init__(self, interval, endtime=1.0, debug=False, progtick=0.05):
+        if FsCore.inited:
+            fscommon.get_logger().warn("Trying to initialize a new simulation object.")
+            sys.exit(-1)
+
         self.__debug = debug
         self.__interval = interval
         self.__now = 0.0
@@ -26,8 +29,8 @@ class FsCore(object):
         self.starttime = self.__now
         self.intr = False
         self.progtick = progtick
-        self.topology = configurator.NullTopology()
-        FsCore.sim = self
+        self.__topology = configurator.NullTopology()
+        fscommon.set_fscore(self)
 
     def progress(self):
         complete = (self.now - self.starttime) / float(self.endtime)
@@ -36,6 +39,10 @@ class FsCore(object):
 
     def sighandler(self, signum, stackframe):
         self.intr = True
+
+    @property
+    def topology(self):
+        return self.__topology
 
     @property
     def debug(self):
@@ -60,7 +67,7 @@ class FsCore(object):
     def run(self, scenario):
         cfg = configurator.FsConfigurator(self.debug)
         if scenario:
-            self.topology = cfg.load_config(scenario)
+            self.__topology = cfg.load_config(scenario)
         else:
             self.logger.info("No simulation scenario specified.  I'll just do nothing!")
 
@@ -95,7 +102,7 @@ def main():
         print >>sys.stderr,"Usage: %s [options] <scenario.dot>" % (sys.argv[0])
         sys.exit(0)
 
-    sim = FS(options.interval, endtime=options.simtime, debug=options.debug)
+    sim = FsCore(options.interval, endtime=options.simtime, debug=options.debug)
     signal.signal(signal.SIGINT, sim.sighandler)
     sim.run(args[0])
 

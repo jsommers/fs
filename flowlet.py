@@ -10,7 +10,6 @@ from collections import namedtuple
 from fsutil import removeuniform
 from pox.openflow.libopenflow_01 import ofp_match
 import pox.openflow.libopenflow_01 as of
-import pdb
 
 class IncompatibleFlowlets(Exception):
     pass

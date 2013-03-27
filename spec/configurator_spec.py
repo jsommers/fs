@@ -35,13 +35,14 @@ class ConfiguratorTests(unittest.TestCase):
         fh = os.fdopen(fd, 'w')
         fh.write(testconf)
         fh.close()
-        
+
     def tearDown(self):
         os.unlink(self.cfgfname)
 
     def testReadConfig(self):
         cfg = configurator.FsConfigurator(debug=True)
         topology = cfg.load_config(self.cfgfname)
+        print topology
 
 if __name__ == '__main__':
     unittest.main()

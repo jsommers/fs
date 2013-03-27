@@ -10,8 +10,7 @@ from collections import Counter, defaultdict
 from flowexport import null_export_factory, text_export_factory, cflowd_export_factory
 import copy
 import networkx
-from fs import FsCore
-import fscommon
+from fscommon import *
 
 from pox.openflow.flow_table import SwitchFlowTable, TableEntry
 from pox.openflow.libopenflow_01 import * # total pollution of namespace - yuck.
@@ -99,23 +98,23 @@ class NodeMeasurement(NullMeasurement):
         # maintenance loop periodically fires thereafter
         # (below code is used to desynchronize router maintenance across net)
 
-        FsCore.sim.after(random()*self.config.maintenance_cycle, 'node-flowexport-'+str(self.node_name), self.flow_export)
+        fscore().after(random()*self.config.maintenance_cycle, 'node-flowexport-'+str(self.node_name), self.flow_export)
 
         if self.config.counterexport and self.config.exportinterval > 0:
             if self.config.exportfile == 'stdout':
                 self.counter_exportfh = sys.stdout
             else:
                 self.counter_exportfh = open('{}_{}.txt'.format(self.node_name, self.config.exportfile), 'w')
-            FsCore.sim.after(0, 'router-snmpexport-'+str(self.node_name), self.counter_export)
+            fscore().after(0, 'router-snmpexport-'+str(self.node_name), self.counter_export)
 
     def counter_export(self):
         if not self.config.counterexport:
             return
 
         for k,v in self.counters.iteritems():
-            print >>self.counter_exportfh, '%8.3f %s->%s %d bytes %d pkts %d flows' % (FsCore.sim.now, k, self.node_name, v[self.BYTECOUNT], v[self.PKTCOUNT], v[self.FLOWCOUNT])
+            print >>self.counter_exportfh, '%8.3f %s->%s %d bytes %d pkts %d flows' % (fscore().now, k, self.node_name, v[self.BYTECOUNT], v[self.PKTCOUNT], v[self.FLOWCOUNT])
         self.counters = defaultdict(Counter)
-        FsCore.sim.after(self.config.exportinterval, 'node-snmpexport-'+str(self.node_name), self.counter_export)
+        fscore().after(self.config.exportinterval, 'node-snmpexport-'+str(self.node_name), self.counter_export)
 
     def flow_export(self):
         config = self.config
@@ -123,12 +122,12 @@ class NodeMeasurement(NullMeasurement):
         for k,v in self.flow_table.iteritems():
             # if flow has been inactive for inactivetmo seconds, or
             # flow has been active longer than longflowtmo seconds, expire it
-            if config.flowinactivetmo > 0 and ((FsCore.sim.now - v.flowend) >= config.flowinactivetmo) and v.flowend > 0:
-                self.exporter.exportflow(FsCore.sim.now, v)
+            if config.flowinactivetmo > 0 and ((fscore().now - v.flowend) >= config.flowinactivetmo) and v.flowend > 0:
+                self.exporter.exportflow(fscore().now, v)
                 killlist.append(k)
 
-            if config.longflowtmo > 0 and ((FsCore.sim.now - v.flowstart) >= config.longflowtmo) and v.flowend > 0:
-                self.exporter.exportflow(FsCore.sim.now, v)
+            if config.longflowtmo > 0 and ((fscore().now - v.flowstart) >= config.longflowtmo) and v.flowend > 0:
+                self.exporter.exportflow(fscore().now, v)
                 killlist.append(k)
 
         for k in killlist:
@@ -136,14 +135,14 @@ class NodeMeasurement(NullMeasurement):
                 del self.flow_table[k]
 
         # reschedule next router maintenance
-        FsCore.sim.after(self.config.maintenance_cycle, 'node-flowexport-'+str(self.node_name), self.flow_export)
+        fscore().after(self.config.maintenance_cycle, 'node-flowexport-'+str(self.node_name), self.flow_export)
 
     def stop(self):
         killlist = []
         for k,v in self.flow_table.iteritems():
             if v.flowend < 0:
-                v.flowend = FsCore.sim.now
-            self.exporter.exportflow(FsCore.sim.now, v)
+                v.flowend = fscore().now
+            self.exporter.exportflow(fscore().now, v)
             killlist.append(k)
 
         for k in killlist:
@@ -161,15 +160,15 @@ class NodeMeasurement(NullMeasurement):
         flet = None
         if flowlet.key in self.flow_table:
             flet = self.flow_table[flowlet.key]
-            flet.flowend = FsCore.sim.now
+            flet.flowend = fscore().now
             flet += flowlet
         else:
             # NB: shallow copy of flowlet; will share same reference to
             # five tuple across the entire simulation
             newflow = 1
             flet = copy.copy(flowlet) 
-            flet.flowend += FsCore.sim.now
-            flet.flowstart = FsCore.sim.now
+            flet.flowend += fscore().now
+            flet.flowstart = fscore().now
             self.flow_table[flet.key] = flet
             flet.ingress_intf = prevnode
         return newflow
@@ -193,9 +192,9 @@ class NodeMeasurement(NullMeasurement):
 
         stored_flowlet = self.flow_table[flowlet.key]
         if stored_flowlet.flowend < 0:
-            stored_flowlet.flowend = FsCore.sim.now
+            stored_flowlet.flowend = fscore().now
         del self.flow_table[flowlet.key]
-        self.exporter.exportflow(FsCore.sim.now, stored_flowlet)
+        self.exporter.exportflow(fscore().now, stored_flowlet)
 
 
 
@@ -213,7 +212,7 @@ class Node(object):
         else:
             self.node_measurements = NullMeasurement()
         self.link_table = {}
-        self.logger = fscommon.get_logger()
+        self.logger = get_logger()
 
     def start(self):
         self.node_measurements.start()
@@ -279,7 +278,7 @@ class OpenflowSwitch(Node):
                 if act.port == 65532 or act.port == 65531:
                     # output port OFPP_FLOOD
                     nh = []
-                    for node in FsCore.sim.graph.node.keys():
+                    for node in fscore().graph.node.keys():
                         if node != self.name and node != 'controller':
                             nh.append(node)
                     return nh
@@ -296,7 +295,7 @@ class OpenflowSwitch(Node):
         entry = self.flow_table.entry_for_packet(flowlet, prevnode)
         if not entry:
             return None
-        entry.touch_packet(flowlet.bytes,now=FsCore.sim.now)
+        entry.touch_packet(flowlet.bytes,now=fscore().now)
         nh = self.apply_actions(flowlet, entry.actions)
         return nh
 
@@ -308,12 +307,12 @@ class OpenflowSwitch(Node):
         # find matches in the table (which should be exactly what we just added), and explicitly
         # set created and last_touched timestamps to "now" in simulation time.
         for m in self.flow_table.matching_entries(ofmessage.message.pox_ofp_message.match):
-            m.counters['created'] = FsCore.sim.now
-            m.counters['last_touched'] = FsCore.sim.now
+            m.counters['created'] = fscore().now
+            m.counters['last_touched'] = fscore().now
         return rv
 
     def table_ager(self):
-        entries = self.flow_table.remove_expired_entries(FsCore.sim.now)
+        entries = self.flow_table.remove_expired_entries(fscore().now)
         # print "in table ager, evicting {} entries.".format(len(entries))
         for entry in entries:
             msg = OpenflowMessage(flowident_from_ofp_match(entry.match), 'ofp_flow_removed', match=entry.match, cookie=entry.cookie, priority=entry.priority, reason=0, duration_sec=0, duration_nsec=0, idle_timeout=entry.idle_timeout, packet_count=entry.counters['packets'], byte_count=entry.counters['bytes'])
@@ -321,12 +320,12 @@ class OpenflowSwitch(Node):
             # FIXME: controller name is hard-coded.  need a general way to identify
             # the link to/name of the controller node
             self.link_table['controller'].flowlet_arrival(msg, self.name, 'controller')
-        FsCore.sim.after(1, "openflow-switch-table-ager"+str(self.name), self.table_ager)
+        fscore().after(1, "openflow-switch-table-ager"+str(self.name), self.table_ager)
         return len(entries)
 
     def start(self):
         Node.start(self)
-        FsCore.sim.after(1, "openflow-switch-table-ager"+str(self.name), self.table_ager)
+        fscore().after(1, "openflow-switch-table-ager"+str(self.name), self.table_ager)
 
     def flowlet_arrival(self, flowlet, prevnode, destnode):
         '''totally ugly, non-DRY grumpy method.  yuck'''
@@ -633,18 +632,18 @@ class L2LearningSwitch(ControllerModule):
 class L3ShortestPaths(ControllerModule):
     def __init__(self):
         ControllerModule.__init__(self)
-        self.logger = fscommon.get_logger()
+        self.logger = get_logger()
         self.graph = None
 
     def handlePacketIn (self, flet, prevnode):
         if not self.graph:
-            self.graph = copy.deepcopy(FsCore.sim.graph)
+            self.graph = copy.deepcopy(fscore().graph)
             self.graph.remove_node('controller')
             # FIXME: ignores weights!
             self.shortest_paths = networkx.shortest_path(self.graph)
 
         origin,dest,prev = flet.get_context()
-        destnode = FsCore.sim.destnode(origin, flet.dstaddr)
+        destnode = fscore().destnode(origin, flet.dstaddr)
         
         path = self.shortest_paths[origin][dest]
         nh = path[1] 
@@ -720,7 +719,7 @@ class Router(Node):
                 del self.flow_table[kkey]
             # print 'subtractive flowlet encountered: removing',len(killlist),'keeping',len(ok),'me:',self.name,'dest',destnode,flowlet
             if destnode != self.name:
-                nh = FsCore.sim.nexthop(self.name, destnode)
+                nh = fscore().nexthop(self.name, destnode)
                 if nh:
                     egress_link = self.link_table[nh]
                     egress_link.flowlet_arrival(flowlet, self.name, destnode)
@@ -739,7 +738,7 @@ class Router(Node):
                     revflow = Flowlet(flowlet.flowident.mkreverse())
                     
                     revflow.ackflow = True
-                    revflow.flowstart = revflow.flowend = FsCore.sim.now
+                    revflow.flowstart = revflow.flowend = fscore().now
 
                     if flowlet.tcpflags & 0x04: # RST
                         return
@@ -762,20 +761,20 @@ class Router(Node):
                     if revflow.endofflow:
                         self.__remove_flowlet(revflow)
 
-                    destnode = FsCore.sim.destnode(self.name, revflow.dstaddr)
+                    destnode = fscore().destnode(self.name, revflow.dstaddr)
 
                     # guard against case that we can't do the autoack due to
                     # no "real" source (i.e., source was spoofed or source addr
                     # has no route)
                     if destnode and destnode != self.name:
-                        nh = FsCore.sim.nexthop(self.name, destnode)
+                        nh = fscore().nexthop(self.name, destnode)
                         if nh:
                             egress_link = self.link_table[nh]
                             egress_link.flowlet_arrival(revflow, self.name, destnode)
                         else:
                             self.logger.debug('No route from %s to %s (trying to run ackflow)' % (self.name, destnode))
             else:
-                nh = FsCore.sim.nexthop(self.name, destnode)
+                nh = fscore().topology.nexthop(self.name, destnode)
                 assert (nh != self.name)
                 if nh:
                     egress_link = self.link_table[nh]

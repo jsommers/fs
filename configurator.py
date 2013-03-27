@@ -7,7 +7,8 @@ from node import *
 from link import *
 from traffic import *
 from pytricia import PyTricia
-import pdb
+import ipaddr
+import fscommon
 
 import networkx
 try:
@@ -22,12 +23,145 @@ else:
 class InvalidTrafficSpecification(Exception):
     pass
 
-class FsConfigurator(object):
-    def __init__(self, sim, debug=0):
-        self.sim = sim
-        self.debug = debug
+class InvalidRoutingConfiguration(Exception):
+    pass
 
-    def loadconfig(self, config):
+class NullTopology(object):
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+class Topology(NullTopology):
+    def __init__(self, graph):
+        self.logger = fscommon.get_logger()
+        self.graph = graph
+        self.routing = None
+        self.nodes = None
+        self.ipdestlpm = None
+        self.owdhash = None
+
+    def node(self, nname):
+        '''get the node object corresponding to a name '''
+        return self.nodes[nname]
+
+    def start(self):
+        for nname,n in self.nodes.iteritems():
+            n.start()
+
+    def stop(self):
+        for nname,n in self.nodes.iteritems():
+            n.stop()     
+            
+    def __linkdown(self, a, b, edict, ttf, ttr):
+        '''kill a link & recompute routing '''
+        self.logger.info('Link failed %s - %s' % (a,b))
+        self.graph.remove_edge(a,b)
+        self.__configure_routing()
+
+        uptime = None
+        try:
+            uptime = next(ttr)
+        except:
+            self.logger.info('Link %s-%s permanently taken down (no recovery time remains in generator)' % (a, b))
+            return
+        else:
+            self.after(uptime, 'link-recovery-'+a+'-'+b, self.__linkup, a, b, edict, ttf, ttr)
+
+        
+    def __linkup(self, a, b, edict, ttf, ttr):
+        '''revive a link & recompute routing '''
+        self.logger.info('Link recovered %s - %s' % (a,b))
+        self.graph.add_edge(a,b,weight=edict.get('weight',1),delay=edict.get('delay',0),capacity=edict.get('capacity',1000000))
+        FsConfigurator.configure_routing(self.routing, self.graph)
+
+        downtime = None
+        try:
+            downtime = next(ttf)
+        except:
+            self.logger.info('Link %s-%s permanently going into service (no failure time remains in generator)' % (a, b))
+            return
+        else:
+            self.after(downtime, 'link-failure-'+a+'-'+b, self.__linkdown, a, b, edict, ttf, ttr)
+
+
+    def owd(self, a, b):
+        '''get the raw one-way delay between a and b '''
+        key = a + ':' + b
+        rv = None
+        if key in self.owdhash:
+            rv = self.owdhash[key]
+        return rv
+
+
+    def delay(self, a, b):
+        '''get the link delay between a and b '''
+        d = self.graph[a][b]
+        if d and 0 in d:
+            return float(d[0]['delay'])
+        return None
+
+        
+    def capacity(self, a, b):
+        '''get the bandwidth between a and b '''
+        d = self.graph[a][b]
+        if d and 0 in d:
+            return int(d[0]['capacity'])
+        return None
+        
+    def nexthop(self, node, dest):
+        '''
+        return the next hop node for a given destination.
+        node: current node
+        dest: dest node name
+        returns: next hop node name
+        '''
+        try:
+            nlist = self.routing[node][dest]
+        except:
+            return None
+        if len(nlist) == 1:
+            return nlist[0]
+        return nlist[1]
+
+    def destnode(self, node, dest):
+        '''
+        return the destination node corresponding to a dest ip.
+        node: current node
+        dest: ipdest
+        returns: destination node name
+        '''
+        # radix trie lpm lookup for destination IP prefix
+        xnode = self.ipdestlpm.get(dest, None)
+
+        if xnode:
+            dlist = xnode['dests']
+            best = None
+            if len(dlist) > 1: 
+                # in the case that there are multiple egress nodes
+                # for the same IP destination, choose the closest egress
+                best = None
+                bestw = 10e6
+                for d in dlist:
+                    w = dijkstra_path_length(self.graph, node, d)
+                    if w < bestw:
+                        bestw = w
+                        best = d
+            else:
+                best = dlist[0]
+
+            return best
+        else:
+            raise InvalidRoutingConfiguration('No route for ' + dest)
+
+
+class FsConfigurator(object):
+    def __init__(self, debug):
+        self.debug = debug
+        self.logger = fscommon.get_logger(debug)
+
+    def load_config(self, config):
         self.graph = networkx.nx_pydot.read_dot(config)
         mconfig_dict = {'counterexport':False, 'flowexportfn':'null_export_factory','counterexportinterval':0, 'counterexportfile':None, 'maintenance_cycle':60, 'pktsampling':1.0, 'flowsampling':1.0, 'longflowtmo':-1, 'flowinactivetmo':-1}
 
@@ -70,7 +204,6 @@ class FsConfigurator(object):
 
     def __configure_edge_reliability(self, a, b, relistr, edict):
         relidict = mkdict(relistr.replace('"', '').strip())
-
         ttf = ttr = None
         for k,v in relidict.iteritems():
             if k == 'failureafter':
@@ -92,7 +225,7 @@ class FsConfigurator(object):
         if ttf or ttr:
             assert(ttf and ttr)
             xttf = next(ttf)
-            self.sim.after(xttf, 'link-failure-'+a+'-'+b, self.__linkdown, a, b, edict, ttf, ttr)
+            self.after(xttf, 'link-failure-'+a+'-'+b, self.__linkdown, a, b, edict, ttf, ttr)
             
     def __configure_routing(self):
         for n in self.graph:
@@ -184,11 +317,11 @@ class FsConfigurator(object):
                 forwarding = rdict.get('forwarding').replace('"','')
 
             if self.debug:
-                print 'adding router',rname,rdict,'autoack',aa
+                self.logger.debug('Adding router {}, {}, autoack={}'.format(rname,rdict,aa))
 
             if classtype not in typehash:
                 raise InvalidTrafficSpecification('Unrecognized node type {}.'.format(classtype))
-            robj = typehash[classtype](rname, self.sim, self.debug, measurement_config, autoack=aa, forwarding=forwarding)
+            robj = typehash[classtype](rname, measurement_config, autoack=aa, forwarding=forwarding)
             self.nodes[rname] = robj
         else:
             robj = self.nodes[rname]
@@ -207,9 +340,6 @@ class FsConfigurator(object):
             self.__addupd_router(rname, rdict, mc)
 
         for a,b,d in self.graph.edges_iter(data=True):
-            if self.debug:
-                print a,b,d
-
             mc = measurement_config                
             if a not in measurement_nodes:
                 mc = None
@@ -222,8 +352,8 @@ class FsConfigurator(object):
             
             cap = self.capacity(a,b)
             delay = self.delay(a,b)
-            ra.add_link(Link(self.sim, cap/8, delay, ra, rb), b)
-            rb.add_link(Link(self.sim, cap/8, delay, rb, ra), a)
+            ra.add_link(Link(cap/8, delay, ra, rb), b)
+            rb.add_link(Link(cap/8, delay, rb, ra), a)
 
 
     def __configure_traffic(self):
@@ -232,19 +362,17 @@ class FsConfigurator(object):
                 continue
                 
             modulators = d['traffic'].split()
-            if self.debug:
-                print 'modulators',modulators
+            self.logger.debug("Traffic modulators configured: {}".format(str(modulators)))
+
             for mkey in modulators:
                 mkey = mkey.replace('"','')
                 modspecstr = d[mkey].replace('"', '')
 
-                if self.debug:
-                    print 'configing mod',modspecstr
+                self.logger.debug('Configing modulator: {}'.format(str(modspecstr)))
                 m = self.__configure_traf_modulator(modspecstr, n, d)
                 m.start()
                 self.traffic_modulators.append(m)
 
-                
 
     def __configure_traf_modulator(self, modstr, srcnode, xdict):
         modspeclist = modstr.split()
@@ -253,10 +381,10 @@ class FsConfigurator(object):
             k,v = modspeclist[i].split('=')
             moddict[k] = v
 
-        if self.debug:
-            print 'inside config_traf_mod',moddict
-
-        assert('profile' in moddict or 'sustain' in moddict)
+        self.logger.debug("inside config_traf_mod: {}".format(moddict))
+        if not 'profile' in moddict or 'sustain' in moddict:
+            self.logger.warn("Need a 'profile' or 'sustain' in traffic specification for {}".format(moddict))
+            sys.exit(-1)
 
         trafprofname = moddict.get('generator', None)
         st = moddict.get('start', None)
@@ -271,16 +399,14 @@ class FsConfigurator(object):
         emerge = moddict.get('emerge', None)
         withdraw = moddict.get('withdraw', None)
 
-        assert (trafprofname in xdict)
+        if not trafprofname in xdict:
+            self.logger.warn("Need a traffic generator name ('generator') in {}".format(xdict))
+            sys.exit(-1)
 
         trafprofstr = xdict[trafprofname]
         trafprofstr = trafprofstr.replace('"','')
-        if self.debug:
-            print 'got profile',trafprofstr
         tgen = self.__configure_traf_spec(trafprofstr, srcnode, xdict)
-        fm = FlowEventGenModulator(self.sim, tgen, stime=st, emerge_profile=emerge, sustain_profile=profile, withdraw_profile=withdraw)
-        if self.debug:
-            print 'flow modulator',fm
+        fm = FlowEventGenModulator(tgen, stime=st, emerge_profile=emerge, sustain_profile=profile, withdraw_profile=withdraw)
         return fm
 
      
@@ -291,26 +417,22 @@ class FsConfigurator(object):
         if trafspeclist[0] == 'rawflow' or trafspeclist[0] == 'simple':
             # configure really simple 'rawflow' traffic generator
             trafdict = mkdict(trafspeclist[1:])
-            if self.debug:    
-                print 'simple trafdict to',srcnode,trafdict
-            gen = lambda: SimpleGeneratorNode(self.sim, srcnode, **trafdict)
+            self.logger.debug("Making simple traffic generator source at {}: {}".format(srcnode, trafdict))
+            gen = lambda: SimpleGeneratorNode(srcnode, **trafdict)
 
         elif trafspeclist[0] == 'harpoon':
             # configure harpoon-style generator
             # configure really simple traffic generator
             trafdict = mkdict(trafspeclist[1:])
-            if self.debug:    
-                print 'harpoon trafdict',srcnode, trafdict
-            gen = lambda: HarpoonGeneratorNode(self.sim, srcnode, **trafdict)
+            self.logger.debug("Making harpoon traffic generator source at {}: {}".format(srcnode, trafdict))
+            gen = lambda: HarpoonGeneratorNode(srcnode, **trafdict)
 
         elif trafspeclist[0] == 'subtractive':
             # configure subtractive anomaly
             trafdict = mkdict(trafspeclist[1:])
-            if self.debug:    
-                print 'subtractive trafdict', srcnode, trafdict
-            gen = lambda: SubtractiveGeneratorNode(self.sim, srcnode, **trafdict)
+            self.logger.debug("Making subtractive traffic generator source at {}: {}".format(srcnode, trafdict))
+            gen = lambda: SubtractiveGeneratorNode(srcnode, **trafdict)
 
         else:
             raise InvalidTrafficSpecification(trafspecstr)
         return gen
-  

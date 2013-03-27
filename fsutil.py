@@ -5,6 +5,8 @@ __author__ = 'jsommers@colgate.edu'
 import random
 import math
 
+logformat='%(asctime)s %(name)-5s %(levelname)-8s %(message)s'
+
 def zipit(xtup):
     assert(len(xtup) == 2)
     a = list(xtup[0])

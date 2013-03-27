@@ -1,39 +1,21 @@
 import unittest
-import fs
+from mock import Mock
+
+from fs import *
 
 class SimTests(unittest.TestCase):
-    pass
+    def testNewSimulatorSingleton(self):
+        sim = FS(1.0)
+        coreobj = sim.core
+        self.assertIs(coreobj, sim)
 
-## FIXME...
-    
-#     def 
-
-
-# def regression():
-#     exporter = text_export_factory
-#     sim = Simulator(0.05, 'i2.dot', exporter, debug=True, endtime=30)
-    
-#     print 'houston->atl delay',sim.delay('houston', 'atlanta')
-#     print 'houston->atl capacity',sim.capacity('houston', 'atlanta')
-#     print 'next hop from ny to chicago',sim.nexthop('newyork','chicago')
-#     print 'next hop from kc to seattle',sim.nexthop('kansascity','seattle')
-#     print 'next hop from atlanta to losangeles',sim.nexthop('atlanta','losangeles')
-
-#     #dn = sim.destnode('newyork', '10.1.1.5')
-#     #print 'dest node from ny to 10.1.1.5 is',dn
-#     #print 'path from ny to',dn,'is:',
-#     #current = 'newyork'
-#     #while current != dn:
-#     #    nh = sim.nexthop(current, dn)
-#     #    print nh,
-#     #    current = nh
-#     #print
-
-#     print 'owd from ny to la:',sim.owd('newyork','losangeles')
-
-#     #gen = SimpleGeneratorNode(sim, 'newyork', ipaddr.IPAddress('10.1.1.5'), ipaddr.IPAddress('10.5.2.5'), 1)
-#     #sim.after(0.1, gen.start)
-#     #sim.run()
+    def testAfter(self):
+        sim = FS(1.0, debug=True, progtick=1.0)
+        def doafter():
+            self.assertEqual(sim.now, 1.0)
+        sim.after(1.0, "test after", doafter)
+        self.assertEqual(sim.now, 0.0)
+        sim.run(None)
 
 if __name__ == '__main__':
     unittest.main()

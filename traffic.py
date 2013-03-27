@@ -12,7 +12,8 @@ import socket
 import re
 import logging
 import random
-import pdb
+import fscommon
+from fs import FsCore
 from pox.lib.addresses import EthAddr 
 
 haveIPAddrGen = False
@@ -40,14 +41,13 @@ def get_mac_addr(ipAddr):
     return mac
 
 class GeneratorNode(object):
-    def __init__(self, sim, srcnode):
-        self.sim = sim
+    def __init__(self, srcnode):
         self.srcnode = srcnode
         self.done = False
-        self.logger = logging.getLogger('flowsim')
+        self.logger = fscommon.get_logger()
         
     def start(self):
-        self.sim.after(0.0, 'gencallback', self.callback)
+        FsCore.sim.after(0.0, 'gencallback', self.callback)
 
     def get_done(self):
         return self.__done
@@ -66,11 +66,11 @@ class InvalidFlowConfiguration(Exception):
 
 
 class SimpleGeneratorNode(GeneratorNode):
-    def __init__(self, sim, srcnode, ipsrc=None, ipdst=None, ipproto=None,
+    def __init__(self, srcnode, ipsrc=None, ipdst=None, ipproto=None,
                  dport=None, sport=None, continuous=True, flowlets=None, tcpflags=None, iptos=None,
                  fps=None, pps=None, bps=None, pkts=None, bytes=None, pktsize=None, 
                  icmptype=None, icmpcode=None, interval=None, autoack=False):
-        GeneratorNode.__init__(self, sim, srcnode)
+        GeneratorNode.__init__(self, srcnode)
         # assume that all keyword params arrive as strings
         # print ipsrc,ipdst
         self.ipsrc = ipaddr.IPNetwork(ipsrc)
@@ -263,9 +263,9 @@ class SimpleGeneratorNode(GeneratorNode):
         else:
             f.pkts = next(self.pkts)
 
-        self.sim.node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode)
+        FsCore.sim.node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode)
         ticks -= 1
-        self.sim.after(xinterval, 'rawflow-flowemit-'+str(self.srcnode), self.flowemit, flowlet, destnode, xinterval, ticks)
+        FsCore.sim.after(xinterval, 'rawflow-flowemit-'+str(self.srcnode), self.flowemit, flowlet, destnode, xinterval, ticks)
 
        
     def callback(self):
@@ -280,7 +280,7 @@ class SimpleGeneratorNode(GeneratorNode):
             f.pkts = next(self.pkts)
 
 
-        destnode = self.sim.destnode(self.srcnode, f.dstaddr)
+        destnode = FsCore.sim.destnode(self.srcnode, f.dstaddr)
 
         # print 'rawflow:',f
         # print 'destnode:',destnode
@@ -306,20 +306,20 @@ class SimpleGeneratorNode(GeneratorNode):
         # print 'xinterval',xinterval
 
         if not ticks or ticks == 1:
-            self.sim.node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode)
+            FsCore.sim.node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode)
         else:
-            self.sim.after(0, 'rawflow-flowemit-'+str(self.srcnode), self.flowemit, f, destnode, xinterval, ticks)
+            FsCore.sim.after(0, 'rawflow-flowemit-'+str(self.srcnode), self.flowemit, f, destnode, xinterval, ticks)
       
         if self.continuous and not self.done:
-            self.sim.after(xinterval, 'rawflow-cb-'+str(self.srcnode), self.callback)
+            FsCore.sim.after(xinterval, 'rawflow-cb-'+str(self.srcnode), self.callback)
         else:
             self.done = True
 
 
 
 class HarpoonGeneratorNode(GeneratorNode):
-    def __init__(self, sim, srcnode, ipsrc='0.0.0.0', ipdst='0.0.0.0', sport=0, dport=0, flowsize=1500, pktsize=1500, flowstart=0, ipproto=socket.IPPROTO_TCP, lossrate=0.001, mss=1460, emitprocess='randomchoice(x)', iptos=0x0, xopen=True, tcpmodel='csa00'):
-        GeneratorNode.__init__(self, sim, srcnode)
+    def __init__(self, srcnode, ipsrc='0.0.0.0', ipdst='0.0.0.0', sport=0, dport=0, flowsize=1500, pktsize=1500, flowstart=0, ipproto=socket.IPPROTO_TCP, lossrate=0.001, mss=1460, emitprocess='randomchoice(x)', iptos=0x0, xopen=True, tcpmodel='csa00'):
+        GeneratorNode.__init__(self, srcnode)
         self.srcnet = ipaddr.IPNetwork(ipsrc)
         self.dstnet = ipaddr.IPNetwork(ipdst)
         if haveIPAddrGen:
@@ -383,7 +383,7 @@ class HarpoonGeneratorNode(GeneratorNode):
     def start(self):
         startt = next(self.flowstartrv)
         # print >>sys.stderr, 'harpoon node starting up at',startt
-        self.sim.after(startt, 'harpoon-start'+str(self.srcnode), self.newflow)
+        FsCore.sim.after(startt, 'harpoon-start'+str(self.srcnode), self.newflow)
 
 
     def newflow(self, test=False, xint=1.0):
@@ -391,7 +391,7 @@ class HarpoonGeneratorNode(GeneratorNode):
             print 'harpoon generator done'
             return
 
-        # print >>sys.stderr, 'making new harpoon flow at',self.sim.now
+        # print >>sys.stderr, 'making new harpoon flow at',FsCore.sim.now
 
         flet = self.__makeflow()
         self.activeflows[flet.key] = 1
@@ -399,8 +399,8 @@ class HarpoonGeneratorNode(GeneratorNode):
         destnode = 'test'
         owd = random.random()*0.05
         if not test:
-            destnode = self.sim.destnode(self.srcnode, flet.dstaddr)
-            owd = self.sim.owd(self.srcnode, destnode)
+            destnode = FsCore.sim.destnode(self.srcnode, flet.dstaddr)
+            owd = FsCore.sim.owd(self.srcnode, destnode)
 
         # owd may be None if routing is temporarily broken because of
         # a link being down and no reachability
@@ -429,7 +429,7 @@ class HarpoonGeneratorNode(GeneratorNode):
             if test:
                 nintervals = math.ceil(flowduration / xint)
             else:
-                nintervals = math.ceil(flowduration / self.sim.interval)
+                nintervals = math.ceil(flowduration / FsCore.sim.interval)
             nintervals = max(nintervals, 1)
             avgemit = flet.size/float(nintervals)
             assert(avgemit > 0.0)
@@ -535,7 +535,7 @@ class HarpoonGeneratorNode(GeneratorNode):
             if test:
                 nintervals = math.ceil(flowduration / xint)
             else:
-                nintervals = math.ceil(flowduration / self.sim.interval)
+                nintervals = math.ceil(flowduration / FsCore.sim.interval)
 
             nintervals = max(nintervals, 1)
             avgemit = flet.size/nintervals
@@ -553,7 +553,7 @@ class HarpoonGeneratorNode(GeneratorNode):
         flet.flowend = flowduration
 
 
-        self.sim.after(0.0, 'flowemit-'+str(self.srcnode), self.flowemit, flet, 0, byteemit, destnode)
+        FsCore.sim.after(0.0, 'flowemit-'+str(self.srcnode), self.flowemit, flet, 0, byteemit, destnode)
         
         # if operating in an 'open-loop' fashion, schedule next
         # incoming flow now (otherwise schedule it when this flow ends;
@@ -561,7 +561,7 @@ class HarpoonGeneratorNode(GeneratorNode):
         if self.xopen:
             nextst = next(self.flowstartrv)
             # print >>sys.stderr, 'scheduling next new harpoon flow at',nextst
-            self.sim.after(nextst, 'newflow-'+str(self.srcnode), self.newflow)
+            FsCore.sim.after(nextst, 'newflow-'+str(self.srcnode), self.newflow)
 
 
     def flowemit(self, flowlet, numsent, emitrv, destnode, test=False):
@@ -609,11 +609,11 @@ class HarpoonGeneratorNode(GeneratorNode):
 
 
         # print '0x%0x flags' % (fsend.tcpflags)
-        self.sim.node(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode)
+        FsCore.sim.node(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode)
 
         # if there are more flowlets, schedule the next one
         if flowlet.bytes > 0:
-            self.sim.after(self.sim.interval, 'flowemit-'+str(self.srcnode), self.flowemit, flowlet, numsent, emitrv, destnode)
+            FsCore.sim.after(FsCore.sim.interval, 'flowemit-'+str(self.srcnode), self.flowemit, flowlet, numsent, emitrv, destnode)
         else:
             # if there's nothing more to send, remove from active flows 
             del self.activeflows[flowlet.key]
@@ -621,7 +621,7 @@ class HarpoonGeneratorNode(GeneratorNode):
             # if we're operating in closed-loop mode, schedule beginning of next flow now that
             # we've completed the current one.
             if not self.xopen:
-                self.sim.after(next(self.flowstartrv), 'newflow-'+str(self.srcnode), self.newflow)
+                FsCore.sim.after(next(self.flowstartrv), 'newflow-'+str(self.srcnode), self.newflow)
     
     def __makeflow(self):
         while True:
@@ -651,9 +651,9 @@ class HarpoonGeneratorNode(GeneratorNode):
         return flet
     
 class SubtractiveGeneratorNode(GeneratorNode):
-    def __init__(self, sim, srcnode, dstnode=None, action=None, ipdstfilt=None,
+    def __init__(self, srcnode, dstnode=None, action=None, ipdstfilt=None,
                  ipsrcfilt=None, ipprotofilt=None):
-        GeneratorNode.__init__(self, sim, srcnode)
+        GeneratorNode.__init__(self, srcnode)
         self.dstnode = dstnode
         self.logger.debug('subtractive: %s %s %s %s %s %s' % (srcnode,dstnode,action,ipdstfilt, ipsrcfilt, ipprotofilt))
         # print >>sys.stderr, 'subtractive: %s %s %s %s %s %s' % (srcnode,dstnode,action,ipdstfilt, ipsrcfilt, ipprotofilt)
@@ -679,16 +679,15 @@ class SubtractiveGeneratorNode(GeneratorNode):
         # at end, set done to True
         f = SubtractiveFlowlet(FlowIdent(self.ipsrcfilt, self.ipdstfilt, ipproto=self.ipprotofilt), action=self.action)
         self.logger.info('Subtractive generator callback')
-        self.sim.node(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode)
+        FsCore.sim.node(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode)
 
 
 class FlowEventGenModulator(object):
-    def __init__(self, sim, gfunc, stime=0, emerge_profile=None, sustain_profile=None, withdraw_profile=None):
-        self.sim = sim
+    def __init__(self, gfunc, stime=0, emerge_profile=None, sustain_profile=None, withdraw_profile=None):
         self.generators = {}
         self.generator_generator = gfunc
         self.starttime = stime
-        self.logger = logging.getLogger('flowsim')
+        self.logger = fscommon.get_logger()
         if isinstance(self.starttime, (int, float)):
             self.starttime = randomchoice(self.starttime)
 
@@ -721,7 +720,7 @@ class FlowEventGenModulator(object):
 
 
     def start(self):
-        self.sim.after(next(self.starttime), 'flowev modulator startup', self.emerge_phase)
+        FsCore.sim.after(next(self.starttime), 'flowev modulator startup', self.emerge_phase)
 
 
     def start_generator(self):
@@ -768,12 +767,12 @@ class FlowEventGenModulator(object):
             nexttime,sources = next(self.emerge)
         except:
             self.logger.info('scheduling transition from emerge to sustain')
-            self.sim.after(0.0, 'modulator transition: emerge->sustain', self.sustain_phase)
+            FsCore.sim.after(0.0, 'modulator transition: emerge->sustain', self.sustain_phase)
         else:
             assert(sources>=0)
             self.__modulate(sources)
             self.logger.info('emerge: %f %d' % (nexttime,sources))
-            self.sim.after(nexttime, 'modulator: emerge', self.emerge_phase)
+            FsCore.sim.after(nexttime, 'modulator: emerge', self.emerge_phase)
 
 
     def sustain_phase(self):
@@ -783,12 +782,12 @@ class FlowEventGenModulator(object):
             nexttime,sources = next(self.sustain)
         except:
             self.logger.info('scheduling transition from sustain to withdraw')
-            self.sim.after(0.0, 'modulator transition: sustain->withdraw', self.withdraw_phase)
+            FsCore.sim.after(0.0, 'modulator transition: sustain->withdraw', self.withdraw_phase)
         else:
             assert(sources>=0)
             self.__modulate(sources)
             self.logger.info('sustain: %f %d' % (nexttime,sources))
-            self.sim.after(nexttime, 'modulator: sustain', self.sustain_phase)
+            FsCore.sim.after(nexttime, 'modulator: sustain', self.sustain_phase)
 
 
     def withdraw_phase(self):
@@ -798,10 +797,10 @@ class FlowEventGenModulator(object):
             nexttime,sources = next(self.withdraw)
         except:
             self.logger.info('finished with withdraw phase')
-            self.sim.after(0, 'modulator: kill_all', self.kill_all_generator)
+            FsCore.sim.after(0, 'modulator: kill_all', self.kill_all_generator)
         else:
             assert(sources>=0)
             self.__modulate(sources)
             self.logger.info('withdraw: %f %d' % (nexttime,sources))
-            self.sim.after(nexttime, 'modulator: withdraw', self.withdraw_phase)
+            FsCore.sim.after(nexttime, 'modulator: withdraw', self.withdraw_phase)
 

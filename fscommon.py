@@ -20,4 +20,3 @@ def set_fscore(obj):
 
 def fscore():
     return __obj
-

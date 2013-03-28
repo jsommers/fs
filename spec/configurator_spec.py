@@ -4,17 +4,39 @@ import tempfile
 import configurator
 import os
 
+# dry out configuration stuff
+# better conf tests 
+# work on lower-layer stuff arp/etc.
+
 testconf = '''
 graph test {
     // 2 nodes: a and b
     flowexportfn=text_export_factory
+    counterexportfile="counters"
+    flowsampling=1.0
+    pktsampling=1.0
+    exportcycle=60
+    counterexport=True
+    counterexportinterval=1
+    longflowtmo=60
+    flowinactivetmo=60
+    measurementnodes="a"
+
+    // slightly DRYer form of configuration
+    harpoon="harpoon ipsrc=10.1.0.0/16 ipdst=10.3.1.0/24 flowsize=exponential(1/10000.0) flowstart=exponential(100) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomchoice(0.001)"
+
+    // another way to DRY things out; only specify things that change
+    harpoonsubspec="flowsize=exponential(1/10000.0) flowstart=exponential(100) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomchoice(0.001)"
 
     a [ 
         autoack="False"
         ipdests="10.1.0.0/16"
-        traffic="m1"
-        m1="modulator start=0.0 generator=s1 profile=((3600,),(1,))"
+        traffic="m1 m2 m3"
+        m1="modulator start=0.0 generator=harpoon profile=((3600,),(1,))"
+        m2="modulator start=0.0 generator=s1 profile=((3600,),(1,))"
+        m3="modulator start=0.0 generator=s2 profile=((3600,),(1,))"
         s1="harpoon ipsrc=10.1.0.0/16 ipdst=10.3.1.0/24 flowsize=exponential(1/10000.0) flowstart=exponential(100) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomchoice(0.001)"
+        s2="harpoon ipsrc=10.2.0.0/16 ipdst=10.4.1.0/24 harpoonsubspec"
     ];
 
     b [ 
@@ -42,7 +64,8 @@ class ConfiguratorTests(unittest.TestCase):
     def testReadConfig(self):
         cfg = configurator.FsConfigurator(debug=True)
         topology = cfg.load_config(self.cfgfname)
-        print topology
+        self.assertItemsEqual(topology.nodes.keys(), ['a','b'])
+        self.assertItemsEqual(topology.links.keys(), [('a','b'),('b','a')])
 
 if __name__ == '__main__':
     unittest.main()

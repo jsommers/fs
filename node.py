@@ -10,13 +10,14 @@ from collections import Counter, defaultdict
 from flowexport import null_export_factory, text_export_factory, cflowd_export_factory
 import copy
 import networkx
+import time
 from fscommon import *
 
 from pox.openflow.flow_table import SwitchFlowTable, TableEntry
 from pox.openflow.libopenflow_01 import * # total pollution of namespace - yuck.
 
 class MeasurementConfig(object):
-    __slots__ = ['__counterexport','__exportfn','__exportinterval','__exportfile','__pktsampling','__flowsampling','__maintenance_cycle','__longflowtmo','__flowinactivetmo']
+    __slots__ = ['__counterexport','__exportfn','__exportinterval','__exportfile','__pktsampling','__flowsampling','__maintenance_cycle','__longflowtmo','__flowinactivetmo','__clockbase']
     def __init__(self, **kwargs):
         self.__counterexport = bool(kwargs.get('counterexport',False))
         self.__exportfn = eval(kwargs.get('flowexportfn','null_export_factory'))
@@ -27,6 +28,9 @@ class MeasurementConfig(object):
         self.__maintenance_cycle = float(kwargs.get('maintenance_cycle',60.0))
         self.__longflowtmo = int(kwargs.get('longflowtmo',-1))
         self.__flowinactivetmo = int(kwargs.get('flowinactivetmo',-1))
+        self.__clockbase = 0
+        if bool(kwargs.get('usewallclock',False)):
+            self.__clockbase = time.time()
 
     @property 
     def counterexport(self):
@@ -63,6 +67,10 @@ class MeasurementConfig(object):
     @property 
     def flowinactivetmo(self):
         return self.__flowinactivetmo
+
+    @property
+    def clockbase(self):
+        return self.__clockbase
 
     def __str__(self):
         return 'MeasurementConfig <{}, {}, {}>'.format(str(self.exportfn), str(self.counterexport), self.exportfile)
@@ -112,7 +120,7 @@ class NodeMeasurement(NullMeasurement):
             return
 
         for k,v in self.counters.iteritems():
-            print >>self.counter_exportfh, '%8.3f %s->%s %d bytes %d pkts %d flows' % (fscore().now, k, self.node_name, v[self.BYTECOUNT], v[self.PKTCOUNT], v[self.FLOWCOUNT])
+            print >>self.counter_exportfh, '%8.3f %s->%s %d bytes %d pkts %d flows' % (fscore().now+self.config.clockbase, k, self.node_name, v[self.BYTECOUNT], v[self.PKTCOUNT], v[self.FLOWCOUNT])
         self.counters = defaultdict(Counter)
         fscore().after(self.config.exportinterval, 'node-snmpexport-'+str(self.node_name), self.counter_export)
 
@@ -123,11 +131,11 @@ class NodeMeasurement(NullMeasurement):
             # if flow has been inactive for inactivetmo seconds, or
             # flow has been active longer than longflowtmo seconds, expire it
             if config.flowinactivetmo > 0 and ((fscore().now - v.flowend) >= config.flowinactivetmo) and v.flowend > 0:
-                self.exporter.exportflow(fscore().now, v)
+                self.exporter.exportflow(fscore().now+self.config.clockbase, v)
                 killlist.append(k)
 
             if config.longflowtmo > 0 and ((fscore().now - v.flowstart) >= config.longflowtmo) and v.flowend > 0:
-                self.exporter.exportflow(fscore().now, v)
+                self.exporter.exportflow(fscore().now+self.config.clockbase, v)
                 killlist.append(k)
 
         for k in killlist:
@@ -142,7 +150,7 @@ class NodeMeasurement(NullMeasurement):
         for k,v in self.flow_table.iteritems():
             if v.flowend < 0:
                 v.flowend = fscore().now
-            self.exporter.exportflow(fscore().now, v)
+            self.exporter.exportflow(fscore().now+self.config.clockbase, v)
             killlist.append(k)
 
         for k in killlist:

@@ -89,7 +89,7 @@ class FsCore(object):
 
 def main():
     parser = OptionParser()
-    parser.prog = "flowmax.py"
+    parser.prog = "fs.py"
     parser.add_option("-d", "--debug", dest="debug", default=False,
                       action="store_true", help="Turn on debugging output")
     parser.add_option("-t", "--simtime", dest="simtime", default=300, type=int,

@@ -39,7 +39,7 @@ def get_mac_addr(ipAddr):
     mac = ''.join(reversed(mac))
     return mac
 
-class GeneratorNode(object):
+class TrafficGenerator(object):
     def __init__(self, srcnode):
         self.srcnode = srcnode
         self.done = False
@@ -64,12 +64,12 @@ class InvalidFlowConfiguration(Exception):
     pass
 
 
-class SimpleGeneratorNode(GeneratorNode):
+class SimpleTrafficGenerator(TrafficGenerator):
     def __init__(self, srcnode, ipsrc=None, ipdst=None, ipproto=None,
                  dport=None, sport=None, continuous=True, flowlets=None, tcpflags=None, iptos=None,
                  fps=None, pps=None, bps=None, pkts=None, bytes=None, pktsize=None, 
                  icmptype=None, icmpcode=None, interval=None, autoack=False):
-        GeneratorNode.__init__(self, srcnode)
+        TrafficGenerator.__init__(self, srcnode)
         # assume that all keyword params arrive as strings
         # print ipsrc,ipdst
         self.ipsrc = ipaddr.IPNetwork(ipsrc)
@@ -316,9 +316,9 @@ class SimpleGeneratorNode(GeneratorNode):
 
 
 
-class HarpoonGeneratorNode(GeneratorNode):
+class HarpoonTrafficGenerator(TrafficGenerator):
     def __init__(self, srcnode, ipsrc='0.0.0.0', ipdst='0.0.0.0', sport=0, dport=0, flowsize=1500, pktsize=1500, flowstart=0, ipproto=socket.IPPROTO_TCP, lossrate=0.001, mss=1460, emitprocess='randomchoice(x)', iptos=0x0, xopen=True, tcpmodel='csa00'):
-        GeneratorNode.__init__(self, srcnode)
+        TrafficGenerator.__init__(self, srcnode)
         self.srcnet = ipaddr.IPNetwork(ipsrc)
         self.dstnet = ipaddr.IPNetwork(ipdst)
         if haveIPAddrGen:
@@ -649,10 +649,10 @@ class HarpoonGeneratorNode(GeneratorNode):
 
         return flet
     
-class SubtractiveGeneratorNode(GeneratorNode):
+class SubtractiveTrafficGenerator(TrafficGenerator):
     def __init__(self, srcnode, dstnode=None, action=None, ipdstfilt=None,
                  ipsrcfilt=None, ipprotofilt=None):
-        GeneratorNode.__init__(self, srcnode)
+        TrafficGenerator.__init__(self, srcnode)
         self.dstnode = dstnode
         self.logger.debug('subtractive: %s %s %s %s %s %s' % (srcnode,dstnode,action,ipdstfilt, ipsrcfilt, ipprotofilt))
         # print >>sys.stderr, 'subtractive: %s %s %s %s %s %s' % (srcnode,dstnode,action,ipdstfilt, ipsrcfilt, ipprotofilt)

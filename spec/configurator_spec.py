@@ -28,6 +28,8 @@ graph test {
     // another way to DRY things out; only specify things that change
     harpoonsubspec="flowsize=exponential(1/10000.0) flowstart=exponential(100) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomchoice(0.001)"
 
+    harpoonsubspec2="flowsize=empiricaldistribution('/tmp/filesizes.txt') flowstart=exponential(100) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomchoice(0.001)"
+
     a [ 
         autoack="False"
         ipdests="10.1.0.0/16"
@@ -35,8 +37,10 @@ graph test {
         m1="modulator start=0.0 generator=harpoon profile=((3600,),(1,))"
         m2="modulator start=0.0 generator=s1 profile=((3600,),(1,))"
         m3="modulator start=0.0 generator=s2 profile=((3600,),(1,))"
+        m4="modulator start=0.0 generator=s3 profile=((3600,),(1,))"
         s1="harpoon ipsrc=10.1.0.0/16 ipdst=10.3.1.0/24 flowsize=exponential(1/10000.0) flowstart=exponential(100) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomchoice(0.001)"
         s2="harpoon ipsrc=10.2.0.0/16 ipdst=10.4.1.0/24 harpoonsubspec"
+        s3="harpoon ipsrc=10.2.0.0/16 ipdst=10.4.1.0/24 harpoonsubspec2"
     ];
 
     b [ 
@@ -58,8 +62,13 @@ class ConfiguratorTests(unittest.TestCase):
         fh.write(testconf)
         fh.close()
 
+        fh = open("/tmp/filesizes.txt", "w")
+        fh.write("100 200 300 400 500\n600 700 800 900 1000\n")
+        fh.close()
+
     def tearDown(self):
         os.unlink(self.cfgfname)
+        os.unlink("/tmp/filesizes.txt")
 
     def testReadConfig(self):
         cfg = configurator.FsConfigurator(debug=True)

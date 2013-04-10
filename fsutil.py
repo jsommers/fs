@@ -110,3 +110,15 @@ def mkdict(s):
 def removeuniform(p):
     while True:
         yield (random.random() < p)
+
+def empiricaldistribution(fname):
+    assert(os.path.exists(fname))
+    while True:    
+        with open(fname, 'r') as infile:
+            for line in infile:
+                for x in line.split():
+                    yield float(x)
+
+# function alias
+empirical = empiricaldistribution
+

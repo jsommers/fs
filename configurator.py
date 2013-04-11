@@ -10,15 +10,10 @@ from pytricia import PyTricia
 import ipaddr
 import fscommon
 import fsutil
+import json
 
-import networkx
-try:
-    from networkx.algorithms.traversal.path import single_source_dijkstra_path, dijkstra_path_length
-except:
-    from networkx.algorithms.shortest_paths.weighted import single_source_dijkstra_path, dijkstra_path_length
-else:
-    print >>sys.stderr,"Can't find the necessary dijkstra's functions in your networkx installation.  You should probably upgrade to a more recent version."
-    sys.exit(-1)
+from networkx import single_source_dijkstra_path, single_source_dijkstra_path_length, read_gml, read_dot
+from networkx.readwrite import json_graph
 
 
 class InvalidTrafficSpecification(Exception):
@@ -222,7 +217,7 @@ class Topology(NullTopology):
                 best = None
                 bestw = 10e6
                 for d in dlist:
-                    w = dijkstra_path_length(self.graph, node, d)
+                    w = single_source_dijkstra_path_length(self.graph, node, d)
                     if w < bestw:
                         bestw = w
                         best = d
@@ -240,29 +235,85 @@ class FsConfigurator(object):
         self.logger = fscommon.get_logger(debug)
 
     def __strip_strings(self):
-        '''Clean up all the strings in the DOT-imported config.'''
+        '''Clean up all the strings in the imported config.'''
         for k in self.graph.graph['graph']:
-            v = self.graph.graph['graph'][k].replace('"','').strip()
-            self.graph.graph['graph'][k] = v
+            if isinstance(self.graph.graph['graph'][k], str):
+                v = self.graph.graph['graph'][k].replace('"','').strip()
+                self.graph.graph['graph'][k] = v
 
         for n,d in self.graph.nodes(data=True):
             for k in d:
-                v = d[k].replace('"','').strip()
-                d[k] = v
+                if isinstance(d[k], str):
+                    v = d[k].replace('"','').strip()
+                    d[k] = v
 
         for a,b,d in self.graph.edges(data=True):
             for k in d:
-                v = d[k].replace('"','').strip()
-                d[k] = v
+                if isinstance(d[k], str):
+                    v = d[k].replace('"','').strip()
+                    d[k] = v
 
+    def __substitute(self, val):
+        '''Recursively substitute $identifiers in a config string'''
+        if not (isinstance(val, str) or isinstance(val, unicode)):
+            return val
 
-    def load_config(self, config):
-        self.graph = networkx.nx_pydot.read_dot(config)
+        # if $identifier (minus $) is a key in graph, replace
+        # it with value of that key.  then fall-through and
+        # recursively substitute any $identifiers
+        if val in self.graph.graph['graph']:
+            self.logger.debug("Found substitution for {}: {}".format(val, self.graph.graph['graph'][val]))
+            val = self.graph.graph['graph'][val]
+
+            # if the resolved value isn't a string, no possible way to do further substitutions, BUT
+            # still need to return as a string to make any higher-up joins work correctly.  ugh.
+            if not(isinstance(val, str) or isinstance(val, unicode)):
+                return str(val)
+
+        items = val.split()
+        for i in range(len(items)):
+            if items[i][0] == '$':
+                # need to do a substitution
+                self.logger.debug("Found substitution symbol {} -- recursing".format(items[i]))
+                items[i] = self.__substitute(items[i][1:])
+        return ' '.join(items)
+
+    def __do_substitutions(self):
+        '''For every string value in graph, nodes, and links, find any $identifier
+           and do a (recursive) substitution of strings, essentially in place (use split/join 
+           to effectively do that.'''
+        for k in self.graph.graph['graph']:
+            v = self.graph.graph['graph'][k]
+            self.graph.graph['graph'][k] = self.__substitute(v)
+
+        for n,d in self.graph.nodes(data=True):
+            for k,v in d.iteritems():
+                d[k] = self.__substitute(v)
+
+        for a,b,d in self.graph.edges(data=True):
+            for k,v in d.iteritems():
+                d[k] = self.__substitute(v)
+
+    def load_config(self, config, configtype="json"):
+        try:
+            if configtype == "dot":
+                self.graph = read_dot(config)
+            elif configtype == "json":
+                self.graph = json_graph.node_link_graph(json.loads(open(config).read().strip()))
+            elif configtype == "gml":
+                self.graph = read_gml(config)
+        except Exception,e:
+            print "Config read error: {}".format(str(e))
+            self.logger.error("Error reading configuration: {}".format(str(e)))
+            sys.exit(-1)
+         
         mconfig_dict = {'counterexport':False, 'flowexportfn':'null_export_factory','counterexportinterval':0, 'counterexportfile':None, 'maintenance_cycle':60, 'pktsampling':1.0, 'flowsampling':1.0, 'longflowtmo':-1, 'flowinactivetmo':-1}
+        print self.graph
 
         print "Reading config for graph {}.".format(self.graph.graph.get('name','(unnamed)'))
 
         self.__strip_strings()
+        self.__do_substitutions()
 
         measurement_nodes = self.graph.nodes()
         for key in self.graph.graph['graph']:
@@ -306,10 +357,11 @@ class FsConfigurator(object):
         forwarding = None
         typehash = {'iprouter':Router, 'ofswitch':OpenflowSwitch, 'ofcontroller':OpenflowController}
         if rname not in self.nodes:
-            aa = 'False'
+            aa = False
             if 'autoack' in rdict:
                 aa = rdict['autoack']
-            aa = eval(aa)
+                if isinstance(aa, str):
+                    aa = eval(aa)
             classtype = rdict.get('type','iprouter')
             # Checking if controller then find out the forwarding technique to be used
             forwarding=None
@@ -424,15 +476,7 @@ class FsConfigurator(object):
         # first item in the trafspec list should be the traffic generator name.
         # also need to traverse the remainder of the and do substitutions for common configuration elements
         tclass = trafspeclist[0].strip().lower().capitalize()
-
-        fulltrafspec = [ ]
-        for i in range(1, len(trafspeclist)):
-            if '=' not in trafspeclist[i] and trafspeclist[i] in self.graph.graph['graph']:
-                commonspec = self.graph.graph['graph'][trafspeclist[i]].split()
-                fulltrafspec.extend(commonspec)
-            else:
-                fulltrafspec.append(trafspeclist[i])
-
+        fulltrafspec = trafspeclist[1:]
         trafgenname = "{}TrafficGenerator".format(tclass)
 
         if trafgenname not in dir(traffic):

@@ -262,7 +262,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
         else:
             f.pkts = next(self.pkts)
 
-        fscore().node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, -1)
+        fscore().node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, 'host')
         ticks -= 1
         fscore().after(xinterval, 'rawflow-flowemit-'+str(self.srcnode), self.flowemit, flowlet, destnode, xinterval, ticks)
 
@@ -305,7 +305,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
         # print 'xinterval',xinterval
 
         if not ticks or ticks == 1:
-            fscore().node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, -1)
+            fscore().node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, 'host')
         else:
             fscore().after(0, "rawflow-flowemit-{}".format(self.srcnode), self.flowemit, f, destnode, xinterval, ticks)
       
@@ -608,7 +608,7 @@ class HarpoonTrafficGenerator(TrafficGenerator):
 
 
         # print '0x%0x flags' % (fsend.tcpflags)
-        fscore().topology.node(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode, -1)
+        fscore().topology.node(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode, 'host')
 
         # if there are more flowlets, schedule the next one
         if flowlet.bytes > 0:
@@ -678,7 +678,7 @@ class SubtractiveTrafficGenerator(TrafficGenerator):
         # at end, set done to True
         f = SubtractiveFlowlet(FlowIdent(self.ipsrcfilt, self.ipdstfilt, ipproto=self.ipprotofilt), action=self.action)
         self.logger.info('Subtractive generator callback')
-        fscore().node(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode, -1)
+        fscore().node(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode, 'host')
 
 
 class FlowEventGenModulator(object):

@@ -2,47 +2,24 @@
     "directed": false, 
     "graph": [
         ["node", {}], 
-        ["graph", {
-            "flowsampling": 1.0, 
-            "counterexportinterval": 1, 
-            "measurementnodes": "b", 
-            "harpooncfg": "ipsrc=10.1.0.0/16 ipdst=10.3.1.0/24 flowsize=exponential(1/10000.0) flowstart=exponential(100) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomchoice(0.001)", 
-            "flowexportfn": "text_export_factory", 
-            "linkdel": 0.042,
-            "linkcap": 1000000000,
-            "pktsampling": 1.0, 
-            "longflowtmo": 60, 
-            "exportcycle": 60, 
-            "counterexport": true,
-            "counterexportfile": "counters", 
-            "flowinactivetmo": 60}
-        ], 
+        ["graph", {"flowexportfn": "text_export_factory"}], 
         ["edge", {}], 
-        ["name", "test"]
-    ], 
+        ["name", "test"]], 
     "nodes": [
-        {
-         "id": "a",
+        {"s1": "harpoon ipsrc=10.1.0.0/16 ipdst=10.3.1.0/24 flowsize=pareto(10000.0,1.2) flowstart=exponential(100) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomchoice(0.001)", 
          "ipdests": "10.1.0.0/16", 
          "traffic": "m1", 
-         "s1": "harpoon $harpooncfg",
          "m1": "modulator start=0.0 generator=s1 profile=((3600,),(1,))", 
-         "autoack": false
-        },
-        {
-         "id": "b"
-        },
-        {
-         "id": "c", 
-         "ipdests": "10.0.0.0/8 10.2.0.0/16 10.3.0.0/16", 
-         "autoack": false
-        }
-    ], 
+         "id": "a", "autoack": false}, 
+        {"ipdests": "10.3.0.0/16 10.4.0.0/16 10.0.0.0/8", 
+         "id": "c", "autoack": false},
+        {"ipdests": "10.2.0.0/16", "id": "b", "autoack": false}],
     "links": [
-        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10},
-        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10},
-        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10},
-        {"delay": "$linkdel", "source": 1, "capacity": "$linkcap", "target": 2, "weight": 20},
-    ], 
+        {"delay": 0.123, "source": 0, "capacity": 100000000, "target": 1, "weight": 30}, 
+        {"delay": 0.123, "source": 0, "capacity": 100000000, "target": 1, "weight": 30}, 
+        {"delay": 0.043, "source": 0, "capacity": 100000000, "target": 2, "weight": 10}, 
+        {"delay": 0.043, "source": 0, "capacity": 100000000, "target": 2, "weight": 10}, 
+        {"delay": 0.031, "source": 1, "capacity": 100000000, "target": 2, "weight": 10}, 
+        {"delay": 0.031, "source": 1, "capacity": 100000000, "target": 2, "weight": 10}], 
     "multigraph": true
 }

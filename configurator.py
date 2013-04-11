@@ -299,7 +299,7 @@ class FsConfigurator(object):
             if configtype == "dot":
                 self.graph = read_dot(config)
             elif configtype == "json":
-                self.graph = json_graph.node_link_graph(json.loads(open(config).read().strip()))
+                self.graph = json_graph.node_link_graph(json.load(open(config)))
             elif configtype == "gml":
                 self.graph = read_gml(config)
         except Exception,e:

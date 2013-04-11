@@ -237,14 +237,18 @@ class Node(object):
     def unmeasure_flow(self, flowlet, prevnode):
         self.node_measurements.remove(flowlet, prevnode)
 
-    def add_link(self, link, next_router):
-        self.link_table[next_router] = link
+    def add_link(self, link, next_node):
+        self.link_table[next_node] = link
 
-    def get_link(self, next_router):
+    def get_link(self, next_node):
         rv = None
         if next_router in self.link_table:
-            rv = self.link_table[next_router]
+            rv = self.link_table[next_node]
         return rv
+
+    def forward(self, next_node, flet, destination):
+        '''forward a flowlet to next_node, on its way to destination'''
+        self.link_table[next_node].flowlet_arrival(flet, self.name, destination)
 
 class UnhandledOpenflowMessage(Exception):
     pass
@@ -327,7 +331,7 @@ class OpenflowSwitch(Node):
 
             # FIXME: controller name is hard-coded.  need a general way to identify
             # the link to/name of the controller node
-            self.link_table['controller'].flowlet_arrival(msg, self.name, 'controller')
+            self.forward('controller', msg, 'controller')
         fscore().after(1, "openflow-switch-table-ager"+str(self.name), self.table_ager)
         return len(entries)
 
@@ -350,7 +354,7 @@ class OpenflowSwitch(Node):
                 self.update_table(flowlet)
                 nexthop = self.match_table(flowlet_out, prev)
                 # self.logger.info("At {} next hop for {}: {}".format(self.name, flowlet_out, nexthop))
-                self.link_table[nexthop].flowlet_arrival(flowlet_out, self.name, dest)
+                self.forward(nexthop, flowlet_out, dest)
 
             elif (flowlet.message_type == 'ofp_packet_out'):
                 # FIXME: assume that the flowlet is passed along as the openflow flowlet data
@@ -359,10 +363,9 @@ class OpenflowSwitch(Node):
                     raise UnhandledOpenflowMessage("Got packet_out message from controller, but I still don't know how to forward it: {}, {}".format(flowlet_out, flowlet.actions))
                 elif isinstance(nexthop, list):
                     for nh in nexthop:
-                        egress_link = self.link_table[nh]
-                        egress_link.flowlet_arrival(flowlet_out, self.name, destnode)
+                        self.forward(nh, flowlet_out, destnode)
                 else:
-                    self.link_table[nexthop].flowlet_arrival(flowlet_out, self.name, nexthop)
+                    self.forward(nexthop, flowlet_out, nexthop)
 
             else:
                 raise UnhandledOpenflowMessage("We only support ofp_flow_mod for now.")
@@ -381,17 +384,15 @@ class OpenflowSwitch(Node):
             #if isinstance(nexthop, collections.Iterable):
             if isinstance(nexthop, list):
                 for nh in nexthop:
-                    egress_link = self.link_table[nh]
-                    egress_link.flowlet_arrival(flowlet, self.name, destnode)
+                    self.forward(nh, flowlet, destnode)
             elif nexthop and nexthop != self.name and nexthop != 'harpoon':
-                egress_link = self.link_table[nexthop]
-                egress_link.flowlet_arrival(flowlet, self.name, destnode)
+                self.forward(nexthop, flowlet, destnode)
             else:
                 #msg.reason = 0 # FIXME
                 ofm = OpenflowMessage(flowlet.flowident, 'ofp_packet_in', in_port=prevnode, reason=0)
                 ofm.data = flowlet                
                 ofm.set_context(self.name, destnode, prevnode)
-                self.link_table['controller'].flowlet_arrival(flowlet=ofm, prevnode=self.name, destnode='controller')
+                self.forward('controller', ofm, 'controller')
                 nexthop = 'controller'
 
         return nexthop
@@ -694,7 +695,7 @@ class OpenflowController(Node):
                 ofm = self.forwardingSwitch.handlePacketIn(flowlet, prevnode)
                 ofm.set_context(*context)
                 ofm.data = orig_flowlet
-                self.link_table[prevnode].flowlet_arrival(ofm, 'controller', nexthop)
+                self.forward(prevnode, ofm, nexthop)
                 return nexthop
             elif(flowlet.message_type == 'ofp_flow_removed'):
                 # FIXME: currently unhandled --- should handle flow table removal events
@@ -729,8 +730,7 @@ class Router(Node):
             if destnode != self.name:
                 nh = fscore().nexthop(self.name, destnode)
                 if nh:
-                    egress_link = self.link_table[nh]
-                    egress_link.flowlet_arrival(flowlet, self.name, destnode)
+                    self.forward(nh, flowlet, destnode)
             return
 
         else:
@@ -777,16 +777,14 @@ class Router(Node):
                     if destnode and destnode != self.name:
                         nh = fscore().nexthop(self.name, destnode)
                         if nh:
-                            egress_link = self.link_table[nh]
-                            egress_link.flowlet_arrival(revflow, self.name, destnode)
+                            self.forward(nh, revflow, destnode)
                         else:
                             self.logger.debug('No route from %s to %s (trying to run ackflow)' % (self.name, destnode))
             else:
                 nh = fscore().topology.nexthop(self.name, destnode)
                 assert (nh != self.name)
                 if nh:
-                    egress_link = self.link_table[nh]
-                    egress_link.flowlet_arrival(flowlet, self.name, destnode)
+                    self.forward(nh, flowlet, destnode)
                 else:
                     self.logger.debug('No route from %s to %s (in router nh decision; ignoring)' % (self.name, destnode))
 

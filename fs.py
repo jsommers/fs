@@ -85,7 +85,7 @@ class FsCore(object):
         expire_time = self.now + delay
         heappush(self.__heap, (expire_time, evid, callback, fnargs))
 
-    def run(self, scenario):
+    def run(self, scenario, configonly=False):
         '''Start the simulation using a particular scenario filename'''
         cfg = configurator.FsConfigurator(self.debug)
         if scenario:
@@ -94,6 +94,10 @@ class FsCore(object):
         else:
             self.logger.info("No simulation scenario specified." +
                              "  I'll just do nothing!")
+
+        if configonly:
+            self.logger.info("Exiting after doing config.")
+            return
 
         self.after(0.0, 'progress indicator', self.progress)
 
@@ -125,6 +129,9 @@ def main():
     parser.add_option("-i", "--interval", dest="interval", 
                       default=1.0, type=float,
                       help="Set the simulation tick interval (sec)")
+    parser.add_option("-c", "--configonly", dest="configonly",
+                      default=False, action="store_true",
+                      help="Just do configuration then exit")
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
@@ -133,7 +140,7 @@ def main():
 
     sim = FsCore(options.interval, endtime=options.simtime, debug=options.debug)
     signal.signal(signal.SIGINT, sim.sighandler)
-    sim.run(args[0])
+    sim.run(args[0], configonly=options.configonly)
 
 if __name__ == '__main__':
     main()

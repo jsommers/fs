@@ -32,8 +32,8 @@
     ], 
     "links": [
         {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10},
-        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10},
-        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10}
+        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 20},
+        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 30}
     ], 
     "multigraph": true
 }

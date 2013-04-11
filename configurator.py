@@ -385,12 +385,15 @@ class FsConfigurator(object):
         build corresponding Routers and Links in the sim world.
         '''
         for rname,rdict in self.graph.nodes_iter(data=True):
+            self.logger.debug("Adding node {} with data {}".format(rname, rdict))
             mc = measurement_config                
             if rname not in measurement_nodes:
                 mc = None
             self.__addupd_router(rname, rdict, mc)
 
         for a,b,d in self.graph.edges_iter(data=True):
+            self.logger.debug("Adding bidirectional link from {}-{} with data {}".format(a, b, d))
+
             mc = measurement_config                
             if a not in measurement_nodes:
                 mc = None
@@ -411,6 +414,10 @@ class FsConfigurator(object):
             ra.add_link(linkfwd, b)
             rb.add_link(linkrev, a)
 
+             #lo:127.0.0.1,s1-eth1:None,s1-eth2:None 
+             #lo:127.0.0.1,s2-eth1:None,s2-eth2:None
+             #h1-eth0:10.0.0.1 
+             #h2-eth0:10.0.0.2 
 
     def __configure_traffic(self):
         for n,d in self.graph.nodes_iter(data=True):

@@ -262,7 +262,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
         else:
             f.pkts = next(self.pkts)
 
-        fscore().node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode)
+        fscore().node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, -1)
         ticks -= 1
         fscore().after(xinterval, 'rawflow-flowemit-'+str(self.srcnode), self.flowemit, flowlet, destnode, xinterval, ticks)
 
@@ -305,12 +305,12 @@ class SimpleTrafficGenerator(TrafficGenerator):
         # print 'xinterval',xinterval
 
         if not ticks or ticks == 1:
-            fscore().node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode)
+            fscore().node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, -1)
         else:
-            fscore().after(0, 'rawflow-flowemit-'+str(self.srcnode), self.flowemit, f, destnode, xinterval, ticks)
+            fscore().after(0, "rawflow-flowemit-{}".format(self.srcnode), self.flowemit, f, destnode, xinterval, ticks)
       
         if self.continuous and not self.done:
-            fscore().after(xinterval, 'rawflow-cb-'+str(self.srcnode), self.callback)
+            fscore().after(xinterval, "rawflow-cb-".format(self.srcnode), self.callback)
         else:
             self.done = True
 
@@ -608,11 +608,11 @@ class HarpoonTrafficGenerator(TrafficGenerator):
 
 
         # print '0x%0x flags' % (fsend.tcpflags)
-        fscore().topology.node(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode)
+        fscore().topology.node(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode, -1)
 
         # if there are more flowlets, schedule the next one
         if flowlet.bytes > 0:
-            fscore().after(fscore().interval, 'flowemit-'+str(self.srcnode), self.flowemit, flowlet, numsent, emitrv, destnode)
+            fscore().after(fscore().interval, "flowemit-{}".format(self.srcnode), self.flowemit, flowlet, numsent, emitrv, destnode)
         else:
             # if there's nothing more to send, remove from active flows 
             del self.activeflows[flowlet.key]
@@ -620,7 +620,7 @@ class HarpoonTrafficGenerator(TrafficGenerator):
             # if we're operating in closed-loop mode, schedule beginning of next flow now that
             # we've completed the current one.
             if not self.xopen:
-                fscore().after(next(self.flowstartrv), 'newflow-'+str(self.srcnode), self.newflow)
+                fscore().after(next(self.flowstartrv), "newflow-{}".format(self.srcnode), self.newflow)
     
     def __makeflow(self):
         while True:
@@ -678,7 +678,7 @@ class SubtractiveTrafficGenerator(TrafficGenerator):
         # at end, set done to True
         f = SubtractiveFlowlet(FlowIdent(self.ipsrcfilt, self.ipdstfilt, ipproto=self.ipprotofilt), action=self.action)
         self.logger.info('Subtractive generator callback')
-        fscore().node(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode)
+        fscore().node(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode, -1)
 
 
 class FlowEventGenModulator(object):

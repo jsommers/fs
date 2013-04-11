@@ -81,7 +81,7 @@ class NullMeasurement(object):
         pass
     def stop(self):
         pass
-    def add(self, flowlet, prevnode):
+    def add(self, flowlet, prevnode, inport):
         pass
     def remove(self, flowlet, prevnode):
         pass
@@ -163,7 +163,7 @@ class NodeMeasurement(NullMeasurement):
         if self.config.flowsampling < 1.0:
             return random() > self.config.flowsampling
 
-    def __addflow(self, flowlet, prevnode):
+    def __addflow(self, flowlet, prevnode, inport):
         newflow = 0
         flet = None
         if flowlet.key in self.flow_table:
@@ -178,7 +178,7 @@ class NodeMeasurement(NullMeasurement):
             flet.flowend += fscore().now
             flet.flowstart = fscore().now
             self.flow_table[flet.key] = flet
-            flet.ingress_intf = prevnode
+            flet.ingress_intf = "{}:{}".format(prevnode,inport)
         return newflow
 
     def __addcounters(self, flowlet, prevnode, newflow):
@@ -187,10 +187,10 @@ class NodeMeasurement(NullMeasurement):
         counters[self.PKTCOUNT] += flowlet.pkts
         counters[self.FLOWCOUNT] += newflow
 
-    def add(self, flowlet, prevnode):
+    def add(self, flowlet, prevnode, inport):
         if self.__nosample():
             return
-        newflow = self.__addflow(flowlet, prevnode)
+        newflow = self.__addflow(flowlet, prevnode, inport)
         if self.config.counterexport:
             self.__addcounters(flowlet, prevnode, newflow)
 
@@ -203,7 +203,6 @@ class NodeMeasurement(NullMeasurement):
             stored_flowlet.flowend = fscore().now
         del self.flow_table[flowlet.key]
         self.exporter.exportflow(fscore().now, stored_flowlet)
-
 
 
 class Node(object):
@@ -219,7 +218,7 @@ class Node(object):
             self.node_measurements = NodeMeasurement(measurement_config, name)
         else:
             self.node_measurements = NullMeasurement()
-        self.link_table = {}
+        self.link_table = defaultdict(list)
         self.logger = get_logger()
 
     def start(self):
@@ -228,27 +227,26 @@ class Node(object):
     def stop(self):
         self.node_measurements.stop()
 
-    def flowlet_arrival(self, flowlet, prevnode, destnode):
+    def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
         pass
 
-    def measure_flow(self, flowlet, prevnode):
-        self.node_measurements.add(flowlet, prevnode)
+    def measure_flow(self, flowlet, prevnode, inport):
+        self.node_measurements.add(flowlet, prevnode, inport)
 
     def unmeasure_flow(self, flowlet, prevnode):
         self.node_measurements.remove(flowlet, prevnode)
 
     def add_link(self, link, next_node):
-        self.link_table[next_node] = link
-
-    def get_link(self, next_node):
-        rv = None
-        if next_router in self.link_table:
-            rv = self.link_table[next_node]
-        return rv
+        self.link_table[next_node].append(link)
+        return len(self.link_table[next_node]) - 1
 
     def forward(self, next_node, flet, destination):
         '''forward a flowlet to next_node, on its way to destination'''
-        self.link_table[next_node].flowlet_arrival(flet, self.name, destination)
+        # FIXME: this does, effectively, ECMP for any parallel links, regardless
+        # of weight.  what's the right thing to do?
+        links = self.link_table[next_node]
+        port = hash(flet) % len(links)
+        links[port].flowlet_arrival(flet, self.name, destination)
 
 class UnhandledOpenflowMessage(Exception):
     pass
@@ -339,7 +337,7 @@ class OpenflowSwitch(Node):
         Node.start(self)
         fscore().after(1, "openflow-switch-table-ager"+str(self.name), self.table_ager)
 
-    def flowlet_arrival(self, flowlet, prevnode, destnode):
+    def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
         '''totally ugly, non-DRY grumpy method.  yuck'''
 
         nexthop = None
@@ -371,7 +369,7 @@ class OpenflowSwitch(Node):
                 raise UnhandledOpenflowMessage("We only support ofp_flow_mod for now.")
 
         elif isinstance(flowlet, Flowlet):
-            self.measure_flow(flowlet, prevnode)
+            self.measure_flow(flowlet, prevnode, input_port)
 
             # JS: done: got to destination
             if destnode == self.name:
@@ -681,7 +679,7 @@ class OpenflowController(Node):
             elif (self.forwarding == 'shortest_paths'):
                 self.forwardingSwitch = L3ShortestPaths()
 
-    def flowlet_arrival(self, flowlet, prevnode, destnode):
+    def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
         if isinstance(flowlet, OpenflowMessage):
             # handle message from controller
             # Check if message_type is ofp_packet_in
@@ -715,7 +713,7 @@ class Router(Node):
         Node.__init__(self, name, measurement_config, **kwargs)
         self.autoack=kwargs.get('autoack',False)
 
-    def flowlet_arrival(self, flowlet, prevnode, destnode):
+    def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
         if isinstance(flowlet, SubtractiveFlowlet):
             killlist = []
             ok = []
@@ -735,7 +733,7 @@ class Router(Node):
 
         else:
             # a "normal" Flowlet object
-            self.measure_flow(flowlet, prevnode)
+            self.measure_flow(flowlet, prevnode, input_port)
 
             # print 'flowlet_arrival',flowlet,'eof?',flowlet.endofflow
             if flowlet.endofflow:
@@ -762,7 +760,7 @@ class Router(Node):
                     revflow.pkts = flowlet.pkts / 2 # brain-dead ack-every-other
                     revflow.bytes = revflow.pkts * 40
 
-                    self.measure_flow(revflow, self.name)
+                    self.measure_flow(revflow, self.name, input_port)
 
                     # weird, but if reverse flow is short enough, it might only
                     # stay in the flow cache for a very short period of time

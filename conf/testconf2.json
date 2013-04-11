@@ -5,7 +5,7 @@
         ["graph", {
             "flowsampling": 1.0, 
             "counterexportinterval": 1, 
-            "measurementnodes": "a", 
+            "measurementnodes": "b", 
             "harpooncfg": "ipsrc=10.1.0.0/16 ipdst=10.3.1.0/24 flowsize=exponential(1/10000.0) flowstart=exponential(100) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomchoice(0.001)", 
             "flowexportfn": "text_export_factory", 
             "linkdel": 0.042,
@@ -21,19 +21,28 @@
         ["name", "test"]
     ], 
     "nodes": [
-        {"id": "a",
-         "ipdests": "10.1.0.0/16", "traffic": "m1", 
-         "s1": "harpoon $harpooncfg",
-         "m1": "modulator start=0.0 generator=s1 profile=((3600,),(1,))", "autoack": false},
         {
-         "id": "b", 
+         "id": "a",
+         "ipdests": "10.1.0.0/16", 
+         "traffic": "m1", 
+         "s1": "harpoon $harpooncfg",
+         "m1": "modulator start=0.0 generator=s1 profile=((3600,),(1,))", 
+         "autoack": false
+        },
+        {
+         "id": "b"
+        },
+        {
+         "id": "c", 
          "ipdests": "10.0.0.0/8 10.2.0.0/16 10.3.0.0/16", 
-         "autoack": false}
+         "autoack": false
+        }
     ], 
     "links": [
         {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10},
-        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 20},
-        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 30}
+        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10},
+        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10},
+        {"delay": "$linkdel", "source": 1, "capacity": "$linkcap", "target": 2, "weight": 20},
     ], 
     "multigraph": true
 }

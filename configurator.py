@@ -409,15 +409,14 @@ class FsConfigurator(object):
 
             linkfwd = Link(cap/8, delay, ra, rb)
             linkrev = Link(cap/8, delay, rb, ra)
-            self.links[(a,b)] = linkfwd
-            self.links[(b,a)] = linkrev
-            ra.add_link(linkfwd, b)
-            rb.add_link(linkrev, a)
-
-             #lo:127.0.0.1,s1-eth1:None,s1-eth2:None 
-             #lo:127.0.0.1,s2-eth1:None,s2-eth2:None
-             #h1-eth0:10.0.0.1 
-             #h2-eth0:10.0.0.2 
+            aport = ra.add_link(linkfwd, b)
+            bport = rb.add_link(linkrev, a)
+            self.links[(a,aport,b,bport)] = linkfwd
+            self.links[(b,bport,a,aport)] = linkrev
+            linkfwd.set_ingress_port(aport)
+            linkfwd.set_egress_port(bport)
+            linkrev.set_ingress_port(bport)
+            linkrev.set_egress_port(aport)
 
     def __configure_traffic(self):
         for n,d in self.graph.nodes_iter(data=True):

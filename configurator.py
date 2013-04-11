@@ -237,25 +237,25 @@ class FsConfigurator(object):
     def __strip_strings(self):
         '''Clean up all the strings in the imported config.'''
         for k in self.graph.graph['graph']:
-            if isinstance(self.graph.graph['graph'][k], str):
+            if isinstance(self.graph.graph['graph'][k], (str,unicode)):
                 v = self.graph.graph['graph'][k].replace('"','').strip()
                 self.graph.graph['graph'][k] = v
 
         for n,d in self.graph.nodes(data=True):
             for k in d:
-                if isinstance(d[k], str):
+                if isinstance(d[k], (str,unicode)):
                     v = d[k].replace('"','').strip()
                     d[k] = v
 
         for a,b,d in self.graph.edges(data=True):
             for k in d:
-                if isinstance(d[k], str):
+                if isinstance(d[k], (str,unicode)):
                     v = d[k].replace('"','').strip()
                     d[k] = v
 
     def __substitute(self, val):
         '''Recursively substitute $identifiers in a config string'''
-        if not (isinstance(val, str) or isinstance(val, unicode)):
+        if not isinstance(val, (str,unicode)):
             return val
 
         # if $identifier (minus $) is a key in graph, replace
@@ -267,7 +267,7 @@ class FsConfigurator(object):
 
             # if the resolved value isn't a string, no possible way to do further substitutions, BUT
             # still need to return as a string to make any higher-up joins work correctly.  ugh.
-            if not(isinstance(val, str) or isinstance(val, unicode)):
+            if not isinstance(val, (str,unicode)):
                 return str(val)
 
         items = val.split()
@@ -308,7 +308,6 @@ class FsConfigurator(object):
             sys.exit(-1)
          
         mconfig_dict = {'counterexport':False, 'flowexportfn':'null_export_factory','counterexportinterval':0, 'counterexportfile':None, 'maintenance_cycle':60, 'pktsampling':1.0, 'flowsampling':1.0, 'longflowtmo':-1, 'flowinactivetmo':-1}
-        print self.graph
 
         print "Reading config for graph {}.".format(self.graph.graph.get('name','(unnamed)'))
 
@@ -360,7 +359,7 @@ class FsConfigurator(object):
             aa = False
             if 'autoack' in rdict:
                 aa = rdict['autoack']
-                if isinstance(aa, str):
+                if isinstance(aa, (str,unicode)):
                     aa = eval(aa)
             classtype = rdict.get('type','iprouter')
             # Checking if controller then find out the forwarding technique to be used
@@ -470,7 +469,7 @@ class FsConfigurator(object):
 
      
     def __configure_traf_spec(self, trafname, trafspec, srcnode):
-        '''Configure a traffic generator based on dot-level specification.'''
+        '''Configure a traffic generator based on specification elements'''
         trafspeclist = trafspec.split()
 
         # first item in the trafspec list should be the traffic generator name.

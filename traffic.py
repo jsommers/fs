@@ -82,7 +82,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
         self.sport = self.dport = None
         self.icmptype = self.icmpcode = None
         self.autoack = False
-        if autoack and isinstance(autoack, str):
+        if autoack and isinstance(autoack, (str,unicode)):
             self.autoack = eval(autoack)
         else:
             self.autoack = autoack
@@ -104,7 +104,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
         else:
             if isinstance(iptos, int):
                 self.iptos = randomchoice(self.iptos)
-            elif isinstance(iptos, str):
+            elif isinstance(iptos, (str,unicode)):
                 self.iptos = eval(iptos)
    
         if self.ipproto == socket.IPPROTO_ICMP:
@@ -140,7 +140,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
         self.continuous = None
         self.nflowlets = None
         if continuous:
-            if isinstance(continuous, str):
+            if isinstance(continuous, (str,unicode)):
                 self.continuous = eval(continuous)
             else:
                 self.continuous = continuous
@@ -325,47 +325,47 @@ class HarpoonTrafficGenerator(TrafficGenerator):
             self.ipsrcgen = ipaddrgen.initialize_trie(int(self.srcnet), self.srcnet.prefixlen, 0.61)
             self.ipdstgen = ipaddrgen.initialize_trie(int(self.dstnet), self.dstnet.prefixlen, 0.61)
 
-        if isinstance(ipproto, str):
+        if isinstance(ipproto, (str,unicode)):
             self.ipproto = eval(ipproto)
         else: 
             self.ipproto = randomchoice(ipproto)
 
-        if isinstance(sport, str):
+        if isinstance(sport, (str,unicode)):
             self.srcports = eval(sport)
         else:
             self.srcports = randomchoice(sport)
 
-        if isinstance(dport, str):
+        if isinstance(dport, (str,unicode)):
             self.dstports = eval(dport)
         else:
             self.dstports = randomchoice(dport)
 
-        if isinstance(flowsize, str):
+        if isinstance(flowsize, (str,unicode)):
             self.flowsizerv = eval(flowsize)
         else:
             self.flowsizerv = randomchoice(flowsize)
 
-        if isinstance(pktsize, str):
+        if isinstance(pktsize, (str,unicode)):
             self.pktsizerv = eval(pktsize)
         else:
             self.pktsizerv = randomchoice(pktsize)
 
-        if isinstance(flowstart, str):
+        if isinstance(flowstart, (str,unicode)):
             self.flowstartrv = eval(flowstart)
         else:
             self.flowstartrv = randomchoice(flowstart)
 
-        if isinstance(lossrate, str):
+        if isinstance(lossrate, (str,unicode)):
             self.lossraterv = eval(lossrate)
         else:
             self.lossraterv = randomchoice(lossrate)
 
-        if isinstance(mss, str):
+        if isinstance(mss, (str,unicode)):
             self.mssrv = eval(mss)
         else:
             self.mssrv = randomchoice(mss)
 
-        if isinstance(iptos, str):
+        if isinstance(iptos, (str,unicode)):
             self.iptosrv = eval(iptos)
         else:
             self.iptosrv = randomchoice(iptos)

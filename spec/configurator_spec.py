@@ -99,6 +99,49 @@ json_conf1 = '''
 
 '''
 
+json_conf2 = '''
+{
+    "directed": false, 
+    "graph": [
+        ["node", {}], 
+        ["graph", {
+            "flowsampling": 1.0, 
+            "counterexportinterval": 1, 
+            "measurementnodes": "a", 
+            "harpooncfg": "ipsrc=10.1.0.0/16 ipdst=10.3.1.0/24 flowsize=exponential(1/10000.0) flowstart=exponential(100) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomchoice(0.001)", 
+            "flowexportfn": "text_export_factory", 
+            "linkdel": 0.042,
+            "linkcap": 1000000000,
+            "pktsampling": 1.0, 
+            "longflowtmo": 60, 
+            "exportcycle": 60, 
+            "counterexport": true,
+            "counterexportfile": "counters", 
+            "flowinactivetmo": 60}
+        ], 
+        ["edge", {}], 
+        ["name", "test"]
+    ], 
+    "nodes": [
+        {"id": "a",
+         "ipdests": "10.1.0.0/16", "traffic": "m1", 
+         "s1": "harpoon $harpooncfg",
+         "m1": "modulator start=0.0 generator=s1 profile=((3600,),(1,))", "autoack": false},
+        {
+         "id": "b", 
+         "ipdests": "10.0.0.0/8 10.2.0.0/16 10.3.0.0/16", 
+         "autoack": false}
+    ], 
+    "links": [
+        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10},
+        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10},
+        {"delay": "$linkdel", "source": 0, "capacity": "$linkcap", "target": 1, "weight": 10}
+    ], 
+    "multigraph": true
+}
+
+'''
+
 class ConfiguratorTests(unittest.TestCase):
     def setUp(self):
         fh = open("/tmp/filesizes.txt", "w")
@@ -124,8 +167,15 @@ class ConfiguratorTests(unittest.TestCase):
         self.assertItemsEqual(topology.nodes.keys(), ['a','b'])
         self.assertItemsEqual(topology.links.keys(), [('a','b'),('b','a')])
 
-    def testReadConfigJson(self):
+    def testReadConfigJson1(self):
         self.mkconfig(json_conf1)
+        cfg = configurator.FsConfigurator(debug=True)
+        topology = cfg.load_config(self.cfgfname, configtype="json")
+        self.assertItemsEqual(topology.nodes.keys(), ['a','b'])
+        self.assertItemsEqual(topology.links.keys(), [('a','b'),('b','a')])
+
+    def testReadConfigJson2(self):
+        self.mkconfig(json_conf2)
         cfg = configurator.FsConfigurator(debug=True)
         topology = cfg.load_config(self.cfgfname, configtype="json")
         self.assertItemsEqual(topology.nodes.keys(), ['a','b'])

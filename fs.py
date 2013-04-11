@@ -6,10 +6,11 @@ Main class for fs: FsCore
 __author__ = 'jsommers@colgate.edu'
 
 
-from heapq import heappush, heappop
 import sys
 import signal
+import os.path
 from optparse import OptionParser
+from heapq import heappush, heappop
 import configurator 
 import fscommon
 
@@ -78,6 +79,9 @@ class FsCore(object):
         '''Schedule an event after delay seconds, identified by
         evid (string), a callback function, and any necessary arguments
         to the function'''
+        if not isinstance(delay, (float,int)):
+            print "Invalid delay: {}".format(delay)
+            sys.exit(-1)
         expire_time = self.now + delay
         heappush(self.__heap, (expire_time, evid, callback, fnargs))
 
@@ -85,7 +89,8 @@ class FsCore(object):
         '''Start the simulation using a particular scenario filename'''
         cfg = configurator.FsConfigurator(self.debug)
         if scenario:
-            self.__topology = cfg.load_config(scenario)
+            root, ext = os.path.splitext(scenario)
+            self.__topology = cfg.load_config(scenario, configtype=ext[1:])
         else:
             self.logger.info("No simulation scenario specified." +
                              "  I'll just do nothing!")

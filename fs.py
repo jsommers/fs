@@ -6,7 +6,7 @@ Main class for fs: FsCore
 __author__ = 'jsommers@colgate.edu'
 
 
-import heapq
+from heapq import heappush, heappop
 import sys
 import signal
 from optparse import OptionParser
@@ -79,7 +79,7 @@ class FsCore(object):
         evid (string), a callback function, and any necessary arguments
         to the function'''
         expire_time = self.now + delay
-        heapq.heappush(self.__heap, (expire_time, evid, callback, fnargs))
+        heappush(self.__heap, (expire_time, evid, callback, fnargs))
 
     def run(self, scenario):
         '''Start the simulation using a particular scenario filename'''
@@ -97,7 +97,7 @@ class FsCore(object):
         while (self.__now - simstart) < self.endtime and not self.intr:
             if len(self.__heap) == 0:
                 break
-            expire_time, evid, callback, fnargs = heapq.heappop(self.__heap)
+            expire_time, evid, callback, fnargs = heappop(self.__heap)
             self.logger.debug("FS event: '{}'' @{}".format(evid, expire_time))
             self.__now = expire_time
             callback(*fnargs)

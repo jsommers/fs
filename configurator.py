@@ -4,7 +4,7 @@ __author__ = 'jsommers@colgate.edu'
 
 import pydot
 from node import *
-from link import *
+from link import Link
 import traffic
 from pytricia import PyTricia
 import ipaddr
@@ -172,7 +172,7 @@ class Topology(NullTopology):
         '''get the link delay between a and b '''
         d = self.graph[a][b]
         if d and 0 in d:
-            return float(d[0]['delay'])
+            return d[0]['delay']
         return None
 
         
@@ -180,7 +180,7 @@ class Topology(NullTopology):
         '''get the bandwidth between a and b '''
         d = self.graph[a][b]
         if d and 0 in d:
-            return int(d[0]['capacity'])
+            return d[0]['capacity']
         return None
         
     def nexthop(self, node, dest):
@@ -404,8 +404,14 @@ class FsConfigurator(object):
                 mc = None
             rb = self.__addupd_router(b, d, mc)
             
-            delay = float(self.graph[a][b][0].get('delay',0))
-            cap = float(self.graph[a][b][0].get('capacity',0))
+            # parse link delay/capacity values and substitute back into
+            # networkx graph to ensure that no additional parsing is needed
+            delay = self.graph[a][b][0].get('delay',0)
+            delay = Link.parse_delay(delay)
+            cap = self.graph[a][b][0].get('capacity',0)
+            cap = Link.parse_capacity(cap)
+            self.graph[a][b][0]['capacity'] = cap
+            self.graph[a][b][0]['delay'] = delay
 
             linkfwd = Link(cap, delay, ra, rb)
             linkrev = Link(cap, delay, rb, ra)

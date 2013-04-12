@@ -8,6 +8,8 @@ optionally keep track of backlog (queuing delay).
 
 __author__ = 'jsommers@colgate.edu'
 
+import sys
+import re
 from fscommon import get_logger, fscore
 
 class Link(object):
@@ -18,8 +20,8 @@ class Link(object):
                  'ingress_node', 'ingress_port', 'ingress_name', 'backlog', 'bdp',
                  'queuealarm', 'lastalarm', 'alarminterval', 'doqdelay', 'logger' ]
     def __init__(self, capacity, delay, ingress_node, egress_node):
-        self.capacity = capacity/8.0 # bytes/sec
-        self.delay = delay
+        self.capacity = Link.parse_capacity(capacity)/8.0 # bytes/sec
+        self.delay = Link.parse_delay(delay)
         self.egress_node = egress_node
         self.egress_port = -1
         self.egress_name = Link.make_portname(self.egress_node.name, self.egress_port)
@@ -35,6 +37,59 @@ class Link(object):
         self.logger = get_logger()
 
     @staticmethod
+    def parse_capacity(capacity):
+        '''Parse config file capacity, return capacity as a float in bits/sec'''
+        if isinstance(capacity, (int,float)):
+            return float(capacity)
+        elif isinstance(capacity, (str, unicode)):
+            if re.match('^(\d+)$', capacity):
+                return float(capacity)
+            # [kK]+anything assumed to be kbit/sec
+            mobj = re.match('^(\d+)[kK]', capacity)
+            if mobj:
+                return float(mobj.groups()[0]) * 1000.0
+
+            # [mM]+anything assumed to be mbit/sec
+            mobj = re.match('^(\d+)[mM]', capacity)
+            if mobj:
+                return float(mobj.groups()[0]) * 1000000.0
+
+            # [gG]+anything assumed to be gbit/sec
+            mobj = re.match('^(\d+)[gG]', capacity)
+            if mobj:
+                return float(mobj.groups()[0]) * 1000000000.0
+
+        get_logger().error("Can't parse link capacity: {}".format(capacity))
+        sys.exit(-1)
+
+    @staticmethod
+    def parse_delay(delay):
+        '''Parse config file delay, return delay as a float in seconds'''
+        if isinstance(delay, (int,float)):
+            return float(delay)
+        elif isinstance(delay, (str, unicode)):
+            if re.match('^(\d+)$', delay):
+                return float(delay)
+
+            # [sS]+anything assumed to be seconds
+            mobj = re.match('^(\d*\.?\d+)s', delay, re.IGNORECASE)
+            if mobj:
+                return float(mobj.groups()[0]) 
+
+            # [ms]+anything assumed to be milliseconds
+            mobj = re.match('^(\d*\.?\d+)ms', delay, re.IGNORECASE)
+            if mobj:
+                return float(mobj.groups()[0]) / 1000.0
+
+            # [us]+anything assumed to be microseconds
+            mobj = re.match('^(\d*\.?\d+)us', delay, re.IGNORECASE)
+            if mobj:
+                return float(mobj.groups()[0]) / 1000000.0
+
+        get_logger().error("Can't parse link delay: {}".format(delay))
+        sys.exit(-1)
+
+    @staticmethod
     def make_portname(node, port):
         '''
         Make a canonical string representing a node/port pair (interface).
@@ -43,7 +98,7 @@ class Link(object):
 
     def set_egress_port(self, endpoint):
         '''
-        Set the egress port number of the link.
+        Set the egress port number of the 'link.
         '''
         self.egress_port = endpoint
         self.egress_name = Link.make_portname(self.egress_node, self.egress_port)

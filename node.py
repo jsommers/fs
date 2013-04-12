@@ -209,7 +209,7 @@ class Node(object):
     '''Base Node class in fs.  All subclasses will want to at least override flowlet_arrival to handle
        the arrival of a new flowlet at the node.'''
 
-    __slots__ = ['name','node_measurements','link_table','logger']
+    __slots__ = ['__name','node_measurements','link_table','logger']
 
     def __init__(self, name, measurement_config, **kwargs):
         # exportfn, exportinterval, exportfile):
@@ -270,6 +270,8 @@ class FsSwitchFlowTable(SwitchFlowTable):
         return None
 
 class OpenflowSwitch(Node):
+    __slots__ = ['flow_table']
+
     def __init__(self, name, measurement_config, **kwargs):
         Node.__init__(self, name, measurement_config, **kwargs)
         self.flow_table = FsSwitchFlowTable()
@@ -713,6 +715,8 @@ class OpenflowController(Node):
 
 
 class Router(Node):
+    __slots__ = ['autoack']
+
     def __init__(self, name, measurement_config, **kwargs): 
         Node.__init__(self, name, measurement_config, **kwargs)
         self.autoack=kwargs.get('autoack',False)

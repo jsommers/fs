@@ -101,14 +101,14 @@ class Link(object):
         Set the egress port number of the 'link.
         '''
         self.egress_port = endpoint
-        self.egress_name = Link.make_portname(self.egress_node, self.egress_port)
+        self.egress_name = Link.make_portname(self.egress_node.name, self.egress_port)
 
     def set_ingress_port(self, endpoint):
         '''
         Set the ingress port number of the link.
         '''
         self.ingress_port = endpoint
-        self.ingress_name = Link.make_portname(self.ingress_node, self.ingress_port)
+        self.ingress_name = Link.make_portname(self.ingress_node.name, self.ingress_port)
 
     def decrbacklog(self, amt):
         '''

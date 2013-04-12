@@ -12,8 +12,7 @@ import socket
 import re
 import logging
 import random
-from fscommon import *
-from pox.lib.addresses import EthAddr 
+from fscommon import fscore, get_logger
 
 haveIPAddrGen = False
 try:

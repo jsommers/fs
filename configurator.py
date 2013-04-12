@@ -407,8 +407,8 @@ class FsConfigurator(object):
             delay = float(self.graph[a][b][0].get('delay',0))
             cap = float(self.graph[a][b][0].get('capacity',0))
 
-            linkfwd = Link(cap/8, delay, ra, rb)
-            linkrev = Link(cap/8, delay, rb, ra)
+            linkfwd = Link(cap, delay, ra, rb)
+            linkrev = Link(cap, delay, rb, ra)
             aport = ra.add_link(linkfwd, b)
             bport = rb.add_link(linkrev, a)
             self.links[(a,aport,b,bport)] = linkfwd

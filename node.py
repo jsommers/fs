@@ -213,13 +213,17 @@ class Node(object):
 
     def __init__(self, name, measurement_config, **kwargs):
         # exportfn, exportinterval, exportfile):
-        self.name = name
+        self.__name = name
         if measurement_config:
             self.node_measurements = NodeMeasurement(measurement_config, name)
         else:
             self.node_measurements = NullMeasurement()
         self.link_table = defaultdict(list)
         self.logger = get_logger()
+
+    @property
+    def name(self):
+        return self.__name
 
     def start(self):
         self.node_measurements.start()

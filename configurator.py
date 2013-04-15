@@ -12,6 +12,7 @@ import fscommon
 import fsutil
 import json
 
+from abc import ABCMeta, abstractmethod
 from networkx import single_source_dijkstra_path, single_source_dijkstra_path_length, read_gml, read_dot
 from networkx.readwrite import json_graph
 
@@ -23,11 +24,15 @@ class InvalidRoutingConfiguration(Exception):
     pass
 
 class NullTopology(object):
+    ___metaclass__ = ABCMeta
+    @abstractmethod
     def start(self):
         pass
 
+    @abstractmethod
     def stop(self):
         pass
+
 
 class Topology(NullTopology):
     def __init__(self, graph, nodes, links, traffic_modulators, debug=False):
@@ -354,7 +359,8 @@ class FsConfigurator(object):
     def __addupd_router(self, rname, rdict, measurement_config):
         robj = None
         forwarding = None
-        typehash = {'iprouter':Router, 'ofswitch':OpenflowSwitch, 'ofcontroller':OpenflowController}
+        # typehash = {'iprouter':Router, 'ofswitch':OpenflowSwitch, 'ofcontroller':OpenflowController}
+        typehash = {'iprouter':Router}
         if rname not in self.nodes:
             aa = False
             if 'autoack' in rdict:

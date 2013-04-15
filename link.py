@@ -68,7 +68,7 @@ class Link(object):
         if isinstance(delay, (int,float)):
             return float(delay)
         elif isinstance(delay, (str, unicode)):
-            if re.match('^(\d+)$', delay):
+            if re.match('^(\d*\.?\d+)$', delay):
                 return float(delay)
 
             # [sS]+anything assumed to be seconds

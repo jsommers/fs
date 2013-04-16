@@ -13,6 +13,8 @@ from optparse import OptionParser
 from heapq import heappush, heappop
 import configurator 
 import fscommon
+import random
+
 
 class FsCore(object):
     '''Core simulation object --- handles event scheduling and
@@ -132,11 +134,16 @@ def main():
     parser.add_option("-c", "--configonly", dest="configonly",
                       default=False, action="store_true",
                       help="Just do configuration then exit")
+    parser.add_option("-s", "--seed", dest="seed",
+                      default=None, type="int",
+                      help="Set random number generation seed.")
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
         print >> sys.stderr,"Usage: %s [options] <scenario.dot>" % (sys.argv[0])
         sys.exit(0)
+
+    random.seed(options.seed)
 
     sim = FsCore(options.interval, endtime=options.simtime, debug=options.debug)
     signal.signal(signal.SIGINT, sim.sighandler)

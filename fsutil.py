@@ -2,8 +2,11 @@
 
 __author__ = 'jsommers@colgate.edu'
 
-import random
-import math
+from random import random, choice, randint, expovariate, \
+                   gammavariate, paretovariate, weibullvariate, \
+                   lognormvariate, normalvariate
+from ipaddr import IPv4Network, IPv4Address
+from math import log, ceil, pow
 
 logformat='%(asctime)s %(name)-5s %(levelname)-8s %(message)s'
 
@@ -15,12 +18,8 @@ def zipit(xtup):
         a = a * len(b)
     a.insert(0,0)
     b.insert(0,b[0])
-    # print 'zipit a',a
-    # print 'zipit b',b
-    # print 'xzip',zip(a,b)
     mg = modulation_generator(zip(a,b))
     return mg
-
 
 def frange(a, b, c):
     xlist = []
@@ -46,15 +45,15 @@ def modulation_generator(xlist):
 
 def randomunifint(lo, hi):
     while True:
-        yield random.randint(lo, hi)
+        yield randint(lo, hi)
 
 def randomuniffloat(lo, hi):
     while True:
-        yield random.random()*(hi-lo)+lo
+        yield random()*(hi-lo)+lo
 
 def randomchoice(*choices):
     while True:
-        yield random.choice(choices)
+        yield choice(choices)
 
 def randomchoicefile(infilename):
     xlist = []
@@ -72,31 +71,27 @@ def randomchoicefile(infilename):
 
 def pareto(offset,alpha):
     while True:
-        # yield offset*random.paretovariate(alpha)
-        yield (offset * ((1.0/math.pow(random.random(), 1.0/alpha)) - 1.0));
-
-#def mypareto(scale, shape):
-#    return (scale * ((1.0/math.pow(random.random(), 1.0/shape)) - 1.0));
+        yield (offset * ((1.0/pow(random(), 1.0/alpha)) - 1.0));
 
 def exponential(lam):
     while True:
-        yield random.expovariate(lam)
+        yield expovariate(lam)
 
 def normal(mean, sdev):
     while True:
-        yield random.normalvariate(mean, sdev)
+        yield normalvariate(mean, sdev)
 
 def lognormal(mean, sdev):
     while True:
-        yield random.lognormvariate(mean, sdev)
+        yield lognormvariate(mean, sdev)
 
 def gamma(alpha, beta):
     while True:
-        yield random.gammavariate(alpha, beta)
+        yield gammavariate(alpha, beta)
 
 def weibull(alpha, beta):
     while True:
-        yield random.weibullvariate(alpha, beta)
+        yield weibullvariate(alpha, beta)
 
 def mkdict(s):
     xdict = {}
@@ -109,7 +104,7 @@ def mkdict(s):
 
 def removeuniform(p):
     while True:
-        yield (random.random() < p)
+        yield (random() < p)
 
 def empiricaldistribution(fname):
     assert(os.path.exists(fname))
@@ -122,3 +117,20 @@ def empiricaldistribution(fname):
 # function alias
 empirical = empiricaldistribution
 
+def subnet_generator(prefix, numhosts):
+    '''Given a prefix and number of hosts to carve out for
+    subnets within this prefix, create a generator object
+    that returns a new subnet (as an ipaddr.IPv4Network) with
+    each subsequent call to next()'''
+
+    ipfx = IPv4Network(prefix)
+    prefixhosts = ipfx.numhosts
+    numhosts += 2
+    numhosts = int(ceil(log(numhosts, 2)) ** 2)
+    prefixlen = '/' + str(32 - int(log(numhosts,2)))
+    baseint = int(ipfx)
+    numsubnets = prefixhosts / numhosts
+    for i in xrange(numsubnets):
+        addr = IPv4Address(baseint + (numhosts * i))
+        prefix = IPv4Network(str(addr) + prefixlen)
+        yield prefix    

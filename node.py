@@ -337,7 +337,7 @@ class Router(Node):
         xnode = self.forwarding_table.get(str(destip), None)
         if xnode:
             dlist = xnode['dests']
-            return dlist[len(dlist) % hash(destip)]
+            return dlist[hash(destip) % len(dlist)]
         return None
 
     def nextHopAddress(self, destip):

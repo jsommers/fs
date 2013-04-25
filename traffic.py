@@ -197,8 +197,8 @@ class SimpleTrafficGenerator(TrafficGenerator):
                 dport = next(self.dport)
                 
         # Creating src and dst mac addresses
-        srcmac = get_mac_addr(srcip)
-        dstmac = get_mac_addr(dstip)
+        srcmac = default_ip_to_macaddr(srcip)
+        dstmac = default_ip_to_macaddr(dstip)
 
         flet = Flowlet(FlowIdent(srcip, dstip, ipproto, sport, dport, srcmac, dstmac))
         flet.iptos = next(self.iptos)
@@ -395,7 +395,7 @@ class HarpoonTrafficGenerator(TrafficGenerator):
         p = next(self.lossraterv)
         basertt = owd * 2.0
 
-        flowduration, avgemit = self.tcpmodel.model(flet.size, flet.mss, fscore().interval, p)
+        flowduration, avgemit = self.tcpmodel.model(flet.size, flet.mss, basertt, fscore().interval, p)
         byteemit = eval(self.emitrvstr.replace('x', 'avgemit'))
 
         # FIXME: add an end timestamp onto flow to indicate its estimated
@@ -491,8 +491,8 @@ class HarpoonTrafficGenerator(TrafficGenerator):
             dport = next(self.dstports)
             fsize = int(next(self.flowsizerv))
             # Creating src and dst mac addresses
-            srcmac = get_mac_addr(srcip)
-            dstmac = get_mac_addr(dstip)
+            srcmac = default_ip_to_macaddr(srcip)
+            dstmac = default_ip_to_macaddr(dstip)
             flet = Flowlet(FlowIdent(srcip, dstip, ipproto, sport, dport, srcmac, dstmac), 
                            bytes=fsize)
             

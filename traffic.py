@@ -2,6 +2,7 @@
 
 __author__ = 'jsommers@colgate.edu'
 
+from importlib import import_module
 from flowlet import *
 from fsutil import *
 import ipaddr
@@ -373,9 +374,11 @@ class HarpoonTrafficGenerator(TrafficGenerator):
 
         self.xopen = xopen
         self.activeflows = {}
-        self.tcpmodel = tcpmodel
-        if self.tcpmodel not in ['mathis','msmo97','csa00']:
-            raise InvalidFlowConfiguration('Unrecognized tcp model for harpoon:'+str(tcpmodel))
+
+        try:
+            self.tcpmodel = import_module("tcpmodels.{}".format(tcpmodel))
+        except ImportError,e:
+            raise InvalidFlowConfiguration('Unrecognized tcp model for harpoon: {} (Error on import: {})'.format(tcpmodel, str(e)))
 
 
     def start(self):
@@ -408,140 +411,9 @@ class HarpoonTrafficGenerator(TrafficGenerator):
         flet.mss = next(self.mssrv)
         p = next(self.lossraterv)
         basertt = owd * 2.0
-        flowduration = 0.0
 
-
-        if self.tcpmodel == 'mathis' or self.tcpmodel == 'msmo97':
-            # mathis model constant C
-            C = math.sqrt(3.0/2)
-            # C = math.sqrt(3.0/4) - delack
-            # C = 1.31
-            # C = 0.93
-            bw = flet.mss / basertt * C/math.sqrt(p)
-
-            if test:
-                print 'mathis bw,loss,owd,mss',bw,p,owd,flet.mss
-
-            # how many intervals will this flowlet last?
-            flowduration = flet.size / bw
-            if test:
-                nintervals = math.ceil(flowduration / xint)
-            else:
-                nintervals = math.ceil(flowduration / fscore().interval)
-            nintervals = max(nintervals, 1)
-            avgemit = flet.size/float(nintervals)
-            assert(avgemit > 0.0)
-
-            if test:
-                print 'intervals to emit',flet.size,':',nintervals
-                print 'emit bytes on avg',avgemit
-    
-            byteemit = eval(self.emitrvstr.replace('x', 'avgemit'))
-    
-            if test:
-                return flet,0,byteemit,destnode
-
-        elif self.tcpmodel == 'csa00':
-            # cardwell, savage, anderson infocom 2000 improvement on pftk98
-
-            # assume losspr is same in forward and reverse direction
-            pr = pf = p
-
-            # initial syn timeout = 3.0 sec
-            ts = 3.0
-
-            initial_window = random.choice([1,2,3])
-
-            gamma = 1.5
-            wmax = 2**20 / flet.mss
-            # print 'wmax:',wmax
-
-
-            # eq(4): expected handshake time
-            elh = basertt + ts * ( (1.0-pr) / (1-2.0*pr) + (1.0 - pf) / (1 - 2*pf) - 2.0)
-
-            # eq(5): expected number of packets in initial slow-start phase
-            d = flet.size // flet.mss
-            if flet.size % flet.mss > 0:
-                d += 1
-            edss = math.floor((1 - (1 - p) ** d) * (1 - p) / p + 1)
-
-            # eq(11): expected window at the end of slowstart
-            ewss = edss * (gamma - 1) / gamma + initial_window/gamma
-
-            # eq(15): expected time to send edss in initial slow start
-            # NB: assume that sources are not receive window limited
-            ewss = edss * (gamma - 1) / gamma + initial_window/gamma
-            if ewss > wmax:
-                etss = basertt * math.log(wmax/initial_window, gamma) + 1.0 + 1.0/wmax *(edss - (gamma * wmax - initial_window)/(gamma - 1.0))
-            else:
-                etss = basertt * math.log(edss*(gamma-1)/initial_window+1,gamma)
-
-            # eq(21)
-            edca = d - edss
-            # print 'data left after slowstart:',edca
-            
-            # eq(16); pr that slowstart ends with a loss
-            lss = 1 - (1-p)**d
-
-            # eq(17)
-            Q = lambda p,w: min(1.0, (1+(1-p)**3*(1-(1-p)**(w-3)))/((1-(1-p)**w)/(1-(1-p)**3)))
-
-            # eq(19)
-            G = lambda p: 1 + p + 2*p**2 + 4*p**3 + 8*p**4 + 16*p**5 + 32*p**6
-
-            # eq(18); cost of an RTO
-            # to = basertt * 4
-            # to = 3 # initial rto (sec)
-            to = basertt * 2
-            Ezto = G(p)*to/(1-p)
-
-            # eq(20)
-            etloss = lss * (Q(p,ewss) * Ezto + (1-Q(p,ewss)) * basertt)
-            
-            # eq(23)
-            b = 2.0
-            wp = 2+b/3*b + math.sqrt(8*(1-p)/3*b*p + (2*b/(3*b))**2)
-
-            # eq(22)
-            if wp < wmax:
-                R = ((1-p)/p+wp/2.0+Q(p,wp)) / (basertt*(b/2.0*wp+1)+(Q(p,wp)*G(p)*to)/(1-p))
-            else:
-                R = ((1-p)/p+wmax/2.0+Q(p,wmax))/(basertt*(b/8.0*wmax+(1-p)/(p*wmax)+Q(p,wmax)*G(p)*to/(1-p)))
-
-            # eq(24): expected time to send remaining data in congestion avoidance
-            etca = edca/R
-
-            etdelack = 0.1
-            
-            # eq(25): expected time for data transfer
-            flowduration = etss + etloss + etca + etdelack
-            
-            #print 'exp handshake',elh
-            #print 'data bytes: %d mss %d pkts %d' % (flet.size, flet.mss, d)
-            #print 'expt d in ss',edss
-            #print 'etss',etss
-            #print 'etloss',etloss
-            #print 'etca',etca
-            #print 'etdelack',etdelack
-            #print 'entire estimated time',flowduration
-
-            # assert(flowduration >= basertt)
-            flowduration = max(flowduration, basertt)
-
-            csa00bw = flet.size / flowduration
-            if test:
-                nintervals = math.ceil(flowduration / xint)
-            else:
-                nintervals = math.ceil(flowduration / fscore().interval)
-
-            nintervals = max(nintervals, 1)
-            avgemit = flet.size/nintervals
-            byteemit = eval(self.emitrvstr.replace('x', 'avgemit'))
-
-            if test:
-                return flet,0,byteemit,destnode
-
+        flowduration, avgemit = self.tcpmodel.model(flet.size, flet.mss, fscore().interval, p)
+        byteemit = eval(self.emitrvstr.replace('x', 'avgemit'))
 
         # FIXME: add an end timestamp onto flow to indicate its estimated
         # duration; routers along path can add that end to arrival time to get
@@ -549,7 +421,6 @@ class HarpoonTrafficGenerator(TrafficGenerator):
         # unclear what to do with raw flows.
         flet.flowstart = 0.0
         flet.flowend = flowduration
-
 
         fscore().after(0.0, 'flowemit-'+str(self.srcnode), self.flowemit, flet, 0, byteemit, destnode)
         

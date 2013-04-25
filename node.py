@@ -204,13 +204,15 @@ class NodeMeasurement(NullMeasurement):
         del self.flow_table[flowlet.key]
         self.exporter.exportflow(fscore().now, stored_flowlet)
 
+class ArpFailure(Exception):
+    pass
 
 class Node(object):
     '''Base Node class in fs.  All subclasses will want to at least override flowlet_arrival to handle
        the arrival of a new flowlet at the node.'''
     __metaclass__ = ABCMeta
 
-    __slots__ = ['__name','node_measurements','link_table','logger','arp_table']
+    __slots__ = ['__name','node_measurements','link_table','logger','arp_table_ip', 'arp_table_node']
 
     def __init__(self, name, measurement_config, **kwargs):
         # exportfn, exportinterval, exportfile):
@@ -221,7 +223,8 @@ class Node(object):
             self.node_measurements = NullMeasurement()
         self.link_table = defaultdict(list)
         self.logger = get_logger()
-        self.arp_table = {}
+        self.arp_table_ip = {}
+        self.arp_table_node = defaultdict(list)
 
     def addStaticArpEntry(self, ipaddr, macaddr, node, interface):
         '''
@@ -231,24 +234,40 @@ class Node(object):
         interface number.  The node name is the node that "owns" the IP address/MAC address pair,
         and the interface number is the index in the link_table list for that node name.
         '''
-        self.arp_table[ipaddr] = (macaddr, node, interface)
+        self.arp_table_ip[ipaddr] = (macaddr, node, interface)
+        self.arp_table_node[node].append( (ipaddr, macaddr, interface) )
 
     def removeStaticArpEntry(self, ipaddr):
         '''
         Remove entry in ARP table for a given IP address.
         '''
-        if ipaddr in self.arp_table:
-            del self.arp_table[ipaddr]
+        if ipaddr in self.arp_table_ip:
+            del self.arp_table_ip[ipaddr]
+
+        #FIXME: need to handle list value in arp_table_node dict
+        for node,xtup in self.arp_table_node.items():
+            if xtup[0] == ipaddr:
+                del self.arp_table_node[node]
+                return
 
     def linkFromNexthopIpAddress(self, ipaddr):
         '''Given a next-hop IP address, return the link object that connects current node
         to that remote IP address, or None if nothing exists.'''
-        pass
+        tup = self.arp_table_ip.get(ipaddr)
+        if not tup:
+            raise ArpFailure()
+        return self.link_table[tup[1]][tup[2]]
 
     def linkFromNexthopNode(self, nodename, flowkey=None):
         '''Given a next-hop node name, return a link object that gets us to that node.  Optionally provide
         a flowlet key in order to hash correctly to the right link in the case of multiple links.'''
-        pass
+        tlist = self.arp_table_node.get(nodename)
+        print "linkfromnexthop: ",tlist
+        if not tlist:
+            raise ArpFailure()
+        tup = tlist[hash(flowkey) % len(tlist)]
+        print "linkfromnexthop:",tup,self.link_table[tup[1]]
+        return self.link_table[tup[1]][tup[2]]
 
     @property
     def name(self):
@@ -316,7 +335,7 @@ class Router(Node):
             xnode['dests'] = [ nexthop ]
         else:
             if nexthop not in xnode['dests']:
-                xnode['dests'].append(nexthop)
+                xnode['dests'].append(ipaddr)
 
     def removeForwardingEntry(self, prefix, nexthop):
         '''Remove an entry from the Node forwarding table.'''
@@ -332,17 +351,13 @@ class Router(Node):
             if not dlist:
                 del self.forwarding_table[pstr]
 
-    def nextHopNode(self, destip):
-        '''Return the next hop from the local forwarding table (next node), based on destination IP address (or prefix)'''
+    def nextHop(self, destip):
+        '''Return the next hop from the local forwarding table (next node, ipaddr), based on destination IP address (or prefix)'''
         xnode = self.forwarding_table.get(str(destip), None)
         if xnode:
             dlist = xnode['dests']
             return dlist[hash(destip) % len(dlist)]
-        return None
-
-    def nextHopAddress(self, destip):
-        '''Return the next hop IP address from local forwarding table based on destination IP address (or prefix)'''
-        assert(1==0)
+        raise ForwardingFailure()
 
     def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
         if isinstance(flowlet, SubtractiveFlowlet):
@@ -411,17 +426,9 @@ class Router(Node):
                             self.logger.debug('No route from %s to %s (trying to run ackflow)' % (self.name, destnode))
 
             else:
-                nextnode = self.nextHopNode(flowlet.dstaddr)                
-
-                if nextnode:
-                    link = self.linkFromNexthopNode(nextnode)
-                else:
-                    raise ForwardingFailure()
-
-                if link:
-                    link.flowlet_arrival(flowlet, self.name, destnode)   
-                else:
-                    raise ForwardingFailure()
+                nextnode = self.nextHop(flowlet.dstaddr)                
+                link = self.linkFromNexthopNode(nextnode, flowkey=flowlet.key)
+                link.flowlet_arrival(flowlet, self.name, destnode)   
 
                 # nh = fscore().topology.nexthop(self.name, destnode)
                 # assert (nh != self.name)

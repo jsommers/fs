@@ -145,3 +145,15 @@ def subnet_generator(prefix, numhosts):
         addr = IPv4Address(baseint + (numhosts * i))
         prefix = IPv4Network(str(addr) + prefixlen)
         yield prefix    
+
+
+def default_ip_to_macaddr(ipaddr):
+    '''Convert an IPv4 address to a 48-bit MAC address-like creature.  Just
+    hardcode the two high-order bytes, and fill in remainder with IP address'''
+    ip = int(IPv4Address(ipaddr))
+    mac = [int('0xca',16),int('fe',16)]
+    for i in xrange(4): 
+        mac.append(((ip >> (8*i)) & 0xff))
+    mac = [ "{:02x}".format(b) for b in mac ]
+    return ':'.join(mac)
+

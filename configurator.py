@@ -33,7 +33,6 @@ class NullTopology(object):
     def stop(self):
         pass
 
-
 class Topology(NullTopology):
     def __init__(self, graph, nodes, links, traffic_modulators, debug=False):
         self.logger = fscommon.get_logger()
@@ -80,6 +79,8 @@ class Topology(NullTopology):
     def __configure_routing(self):
         for n in self.graph:
             self.routing[n] = single_source_dijkstra_path(self.graph, n)
+
+
         if self.debug:
             for n,d in self.graph.nodes_iter(data=True):
                 print n,d
@@ -99,6 +100,18 @@ class Topology(NullTopology):
                     xnode['net'] = ipnet
                     xnode['dests'] = [ n ]
 
+        # install static forwarding table entries to each node
+        for nodename,nodeobj in self.nodes.iteritems():
+            if isinstance(nodeobj, Router):
+                for prefix in self.ipdestlpm:
+                    lpmnode = self.ipdestlpm[prefix] 
+                    if nodename not in lpmnode['dests']:
+                        routes = self.routing[nodename]
+                        for d in lpmnode['dests']:
+                            path = routes[d]
+                            nexthop = path[1]
+                            nodeobj.addForwardingEntry(prefix, nexthop)
+                
         self.owdhash = {}
         for a in self.graph:
             for b in self.graph:
@@ -116,6 +129,7 @@ class Topology(NullTopology):
                 for i in xrange(len(rlist)-1):
                     owd += self.delay(rlist[i],rlist[i+1])
                 self.owdhash[key] = owd
+
 
     def node(self, nname):
         '''get the node object corresponding to a name '''
@@ -367,7 +381,7 @@ class FsConfigurator(object):
                 aa = rdict['autoack']
                 if isinstance(aa, (str,unicode)):
                     aa = eval(aa)
-            classtype = rdict.get('type','iprouter')
+            classtype = rdict.get('type','iprouter') # node defaults to being an iprouter
             # Checking if controller then find out the forwarding technique to be used
             forwarding=None
             if classtype == 'ofcontroller':
@@ -397,6 +411,9 @@ class FsConfigurator(object):
                 mc = None
             self.__addupd_router(rname, rdict, mc)
 
+        # FIXME: let this be configurable
+        subnetter = subnet_generator("172.16.0.0/12", 2) 
+
         for a,b,d in self.graph.edges_iter(data=True):
             self.logger.debug("Adding bidirectional link from {}-{} with data {}".format(a, b, d))
 
@@ -419,10 +436,12 @@ class FsConfigurator(object):
             self.graph[a][b][0]['capacity'] = cap
             self.graph[a][b][0]['delay'] = delay
 
+            ipa,ipb = [ ip for ip in next(subnetter).iterhosts() ]
+
             linkfwd = Link(cap, delay, ra, rb)
             linkrev = Link(cap, delay, rb, ra)
-            aport = ra.add_link(linkfwd, b)
-            bport = rb.add_link(linkrev, a)
+            aport = ra.add_link(linkfwd, ipa, ipb, b)
+            bport = rb.add_link(linkrev, ipb, ipa, a)
             self.links[(a,aport,b,bport)] = linkfwd
             self.links[(b,bport,a,aport)] = linkrev
             linkfwd.set_ingress_port(aport)

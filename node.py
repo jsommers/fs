@@ -11,8 +11,10 @@ from collections import Counter, defaultdict
 from flowexport import null_export_factory, text_export_factory, cflowd_export_factory
 import copy
 import networkx
+from pytricia import PyTricia
 import time
 from fscommon import *
+from fsutil import default_ip_to_macaddr, subnet_generator
 
 class MeasurementConfig(object):
     __slots__ = ['__counterexport','__exportfn','__exportinterval','__exportfile','__pktsampling','__flowsampling','__maintenance_cycle','__longflowtmo','__flowinactivetmo','__clockbase']
@@ -208,7 +210,7 @@ class Node(object):
        the arrival of a new flowlet at the node.'''
     __metaclass__ = ABCMeta
 
-    __slots__ = ['__name','node_measurements','link_table','logger']
+    __slots__ = ['__name','node_measurements','link_table','logger','arp_table']
 
     def __init__(self, name, measurement_config, **kwargs):
         # exportfn, exportinterval, exportfile):
@@ -219,6 +221,34 @@ class Node(object):
             self.node_measurements = NullMeasurement()
         self.link_table = defaultdict(list)
         self.logger = get_logger()
+        self.arp_table = {}
+
+    def addStaticArpEntry(self, ipaddr, macaddr, node, interface):
+        '''
+        Key in ARP table: destination IP address (not a prefix, an actual address).
+
+        Value in table: tuple containing MAC address corresponding to IP address, node name, and
+        interface number.  The node name is the node that "owns" the IP address/MAC address pair,
+        and the interface number is the index in the link_table list for that node name.
+        '''
+        self.arp_table[ipaddr] = (macaddr, node, interface)
+
+    def removeStaticArpEntry(self, ipaddr):
+        '''
+        Remove entry in ARP table for a given IP address.
+        '''
+        if ipaddr in self.arp_table:
+            del self.arp_table[ipaddr]
+
+    def linkFromNexthopIpAddress(self, ipaddr):
+        '''Given a next-hop IP address, return the link object that connects current node
+        to that remote IP address, or None if nothing exists.'''
+        pass
+
+    def linkFromNexthopNode(self, nodename, flowkey=None):
+        '''Given a next-hop node name, return a link object that gets us to that node.  Optionally provide
+        a flowlet key in order to hash correctly to the right link in the case of multiple links.'''
+        pass
 
     @property
     def name(self):
@@ -240,26 +270,79 @@ class Node(object):
     def unmeasure_flow(self, flowlet, prevnode):
         self.node_measurements.remove(flowlet, prevnode)
 
-    def add_link(self, link, next_node):
+    def add_link(self, link, hostip, remoteip, next_node):
+        '''Add a new interface and link to this node.  link is the link object connecting
+        this node to next_node.  hostip is the ip address assigned to the local interface for this
+        link, and remoteip is the ip address assigned to the remote interface of the link.'''
         self.link_table[next_node].append(link)
-        return len(self.link_table[next_node]) - 1
+        interface_num = len(self.link_table[next_node]) - 1
+        remotemac = default_ip_to_macaddr(remoteip)
+        self.addStaticArpEntry(remoteip, remotemac, next_node, interface_num)
+        return interface_num
 
-    def forward(self, next_node, flet, destination):
-        '''forward a flowlet to next_node, on its way to destination'''
-        # FIXME: this does, effectively, ECMP for any parallel links, regardless
-        # of weight.  what's the right thing to do?
-        links = self.link_table[next_node]
-        port = hash(flet) % len(links)
-        links[port].flowlet_arrival(flet, self.name, destination)
+    # def forward(self, next_node, flet, destination):
+    #     '''forward a flowlet to next_node, on its way to destination'''
+    #     # FIXME: this does, effectively, ECMP for any parallel links, regardless
+    #     # of weight.  what's the right thing to do?
+    #     links = self.link_table[next_node]
+    #     port = hash(flet) % len(links)
+    #     links[port].flowlet_arrival(flet, self.name, destination)
 
 
+class ForwardingFailure(Exception):
+    pass
 
 class Router(Node):
-    __slots__ = ['autoack']
+    __slots__ = ['autoack', 'forwarding_table']
 
     def __init__(self, name, measurement_config, **kwargs): 
         Node.__init__(self, name, measurement_config, **kwargs)
         self.autoack=kwargs.get('autoack',False)
+        self.forwarding_table = PyTricia()
+
+    def addForwardingEntry(self, prefix, nexthop):
+        '''Add new forwarding table entry to Node, given a destination prefix
+           and a nexthop (node name)'''
+        pstr = str(prefix)
+        xnode = None
+        if pstr in self.forwarding_table:
+            xnode = self.forwarding_table[pstr]
+        else:
+            xnode = {}
+            self.forwarding_table[pstr] = xnode
+        xnode['net'] = prefix
+        dlist = xnode.get('dests', None)
+        if not dlist:
+            xnode['dests'] = [ nexthop ]
+        else:
+            if nexthop not in xnode['dests']:
+                xnode['dests'].append(nexthop)
+
+    def removeForwardingEntry(self, prefix, nexthop):
+        '''Remove an entry from the Node forwarding table.'''
+        pstr = str(prefix)
+        if pstr not in self.forwarding_table:
+            return
+        xnode = self.forwarding_table[pstr]
+        dlist = xnode.get('dests', None)
+        if dlist:
+            # remove next hop entry.  if that was the last
+            # entry, remove the entire prefix from the table.
+            dlist.remove(nexthop)
+            if not dlist:
+                del self.forwarding_table[pstr]
+
+    def nextHopNode(self, destip):
+        '''Return the next hop from the local forwarding table (next node), based on destination IP address (or prefix)'''
+        xnode = self.forwarding_table.get(str(destip), None)
+        if xnode:
+            dlist = xnode['dests']
+            return dlist[len(dlist) % hash(destip)]
+        return None
+
+    def nextHopAddress(self, destip):
+        '''Return the next hop IP address from local forwarding table based on destination IP address (or prefix)'''
+        assert(1==0)
 
     def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
         if isinstance(flowlet, SubtractiveFlowlet):
@@ -283,7 +366,6 @@ class Router(Node):
             # a "normal" Flowlet object
             self.measure_flow(flowlet, prevnode, input_port)
 
-            # print 'flowlet_arrival',flowlet,'eof?',flowlet.endofflow
             if flowlet.endofflow:
                 self.unmeasure_flow(flowlet, prevnode)
 
@@ -315,6 +397,7 @@ class Router(Node):
                     if revflow.endofflow:
                         self.unmeasure_flow(revflow, prevnode)
 
+
                     destnode = fscore().destnode(self.name, revflow.dstaddr)
 
                     # guard against case that we can't do the autoack due to
@@ -326,11 +409,24 @@ class Router(Node):
                             self.forward(nh, revflow, destnode)
                         else:
                             self.logger.debug('No route from %s to %s (trying to run ackflow)' % (self.name, destnode))
+
             else:
-                nh = fscore().topology.nexthop(self.name, destnode)
-                assert (nh != self.name)
-                if nh:
-                    self.forward(nh, flowlet, destnode)
+                nextnode = self.nextHopNode(flowlet.dstaddr)                
+
+                if nextnode:
+                    link = self.linkFromNexthopNode(nextnode)
                 else:
-                    self.logger.debug('No route from %s to %s (in router nh decision; ignoring)' % (self.name, destnode))
+                    raise ForwardingFailure()
+
+                if link:
+                    link.flowlet_arrival(flowlet, self.name, destnode)   
+                else:
+                    raise ForwardingFailure()
+
+                # nh = fscore().topology.nexthop(self.name, destnode)
+                # assert (nh != self.name)
+                # if nh:
+                #     self.forward(nh, flowlet, destnode)
+                # else:
+                #     self.logger.debug('No route from %s to %s (in router nh decision; ignoring)' % (self.name, destnode))
 

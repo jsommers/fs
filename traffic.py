@@ -22,23 +22,6 @@ try:
 except:
     pass
 
-def get_mac_addr(ipAddr):
-    mac = ''
-    num = 0
-    for i in range(len(ipAddr)):
-        if ipAddr[i].isdigit():
-            num += 1
-            mac += ipAddr[i]
-            if num % 2 == 0:
-                mac += ':'
-    while num < 12:
-        mac += '0'
-        num += 1
-        if num != 12 and num % 2 == 0:
-            mac += ':'
-    mac = ''.join(reversed(mac))
-    return mac
-
 class TrafficGenerator(object):
     def __init__(self, srcnode):
         self.srcnode = srcnode

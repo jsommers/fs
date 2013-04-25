@@ -2,11 +2,9 @@
 
 __author__ = 'jsommers@colgate.edu'
 
-from random import random, choice, randint, expovariate, \
-                   gammavariate, paretovariate, weibullvariate, \
-                   lognormvariate, normalvariate
+import random
 from ipaddr import IPv4Network, IPv4Address
-from math import log, ceil, pow
+import math 
 
 logformat='%(asctime)s %(name)-5s %(levelname)-8s %(message)s'
 
@@ -44,16 +42,19 @@ def modulation_generator(xlist):
         yield x
 
 def randomunifint(lo, hi):
+    r = random.randint
     while True:
-        yield randint(lo, hi)
+        yield r(lo, hi)
 
 def randomuniffloat(lo, hi):
+    r = random.random
     while True:
-        yield random()*(hi-lo)+lo
+        yield r()*(hi-lo)+lo
 
 def randomchoice(*choices):
+    r = random.choice
     while True:
-        yield choice(choices)
+        yield r(choices)
 
 def randomchoicefile(infilename):
     xlist = []
@@ -70,28 +71,35 @@ def randomchoicefile(infilename):
         index = (index + 1) % len(xlist)
 
 def pareto(offset,alpha):
+    pow = math.pow
+    r = random.random
     while True:
-        yield (offset * ((1.0/pow(random(), 1.0/alpha)) - 1.0));
+        yield (offset * ((1.0/pow(r(), 1.0/alpha)) - 1.0));
 
 def exponential(lam):
+    r = random.expovariate
     while True:
-        yield expovariate(lam)
+        yield r(lam)
 
 def normal(mean, sdev):
+    r = random.normalvariate
     while True:
-        yield normalvariate(mean, sdev)
+        yield r(mean, sdev)
 
 def lognormal(mean, sdev):
+    r = random.lognormvariate
     while True:
-        yield lognormvariate(mean, sdev)
+        yield r(mean, sdev)
 
 def gamma(alpha, beta):
+    r = random.gammavariate
     while True:
-        yield gammavariate(alpha, beta)
+        yield r(alpha, beta)
 
 def weibull(alpha, beta):
+    r = random.weibullvariate
     while True:
-        yield weibullvariate(alpha, beta)
+        yield r(alpha, beta)
 
 def mkdict(s):
     xdict = {}
@@ -103,8 +111,9 @@ def mkdict(s):
     return xdict
 
 def removeuniform(p):
+    r = random.random
     while True:
-        yield (random() < p)
+        yield (r() < p)
 
 def empiricaldistribution(fname):
     assert(os.path.exists(fname))
@@ -122,6 +131,8 @@ def subnet_generator(prefix, numhosts):
     subnets within this prefix, create a generator object
     that returns a new subnet (as an ipaddr.IPv4Network) with
     each subsequent call to next()'''
+    ceil = math.ceil
+    log = math.log
 
     ipfx = IPv4Network(prefix)
     prefixhosts = ipfx.numhosts

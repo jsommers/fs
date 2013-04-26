@@ -212,7 +212,7 @@ class Node(object):
        the arrival of a new flowlet at the node.'''
     __metaclass__ = ABCMeta
 
-    __slots__ = ['__name','node_measurements','link_table','logger','arp_table_ip', 'arp_table_node']
+    __slots__ = ['__name','node_measurements','interfaces','logger','arp_table_ip', 'arp_table_node']
 
     def __init__(self, name, measurement_config, **kwargs):
         # exportfn, exportinterval, exportfile):
@@ -221,53 +221,43 @@ class Node(object):
             self.node_measurements = NodeMeasurement(measurement_config, name)
         else:
             self.node_measurements = NullMeasurement()
-        self.link_table = defaultdict(list)
+        self.interfaces = {}
         self.logger = get_logger()
         self.arp_table_ip = {}
         self.arp_table_node = defaultdict(list)
 
-    def addStaticArpEntry(self, ipaddr, macaddr, node, interface):
+    def addStaticArpEntry(self, ipaddr, macaddr, node):
         '''
         Key in ARP table: destination IP address (not a prefix, an actual address).
 
-        Value in table: tuple containing MAC address corresponding to IP address, node name, and
-        interface number.  The node name is the node that "owns" the IP address/MAC address pair,
-        and the interface number is the index in the link_table list for that node name.
+        Value in table: tuple containing MAC address corresponding to IP address, and node name.
+        The node name is the node that "owns" the IP address/MAC address pair (i.e. remote IP/MAC.
         '''
-        self.arp_table_ip[ipaddr] = (macaddr, node, interface)
-        self.arp_table_node[node].append( (ipaddr, macaddr, interface) )
+        self.arp_table_ip[ipaddr] = (macaddr, node)
+        self.arp_table_node[node].append( (ipaddr, macaddr) )
 
     def removeStaticArpEntry(self, ipaddr):
         '''
         Remove entry in ARP table for a given IP address.
         '''
         if ipaddr in self.arp_table_ip:
-            del self.arp_table_ip[ipaddr]
-
-        #FIXME: need to handle list value in arp_table_node dict
-        for node,xtup in self.arp_table_node.items():
-            if xtup[0] == ipaddr:
-                del self.arp_table_node[node]
-                return
+            mac,node = self.arp_table_ip.pop(ipaddr)
+            xli = self.arp_table_node[node]
+            xli.remove( (ipaddr,mac) )
 
     def linkFromNexthopIpAddress(self, ipaddr):
         '''Given a next-hop IP address, return the link object that connects current node
-        to that remote IP address, or None if nothing exists.'''
-        tup = self.arp_table_ip.get(ipaddr)
-        if not tup:
-            raise ArpFailure()
-        return self.link_table[tup[1]][tup[2]]
+        to that remote IP address, or an exception if nothing exists.'''
+        return self.interfaces.get(ipaddr,None)
 
     def linkFromNexthopNode(self, nodename, flowkey=None):
         '''Given a next-hop node name, return a link object that gets us to that node.  Optionally provide
         a flowlet key in order to hash correctly to the right link in the case of multiple links.'''
         tlist = self.arp_table_node.get(nodename)
-        print "linkfromnexthop: ",tlist
         if not tlist:
             raise ArpFailure()
         tup = tlist[hash(flowkey) % len(tlist)]
-        print "linkfromnexthop:",tup,self.link_table[tup[1]]
-        return self.link_table[tup[1]][tup[2]]
+        return self.interfaces[tup[0]]
 
     @property
     def name(self):
@@ -293,11 +283,10 @@ class Node(object):
         '''Add a new interface and link to this node.  link is the link object connecting
         this node to next_node.  hostip is the ip address assigned to the local interface for this
         link, and remoteip is the ip address assigned to the remote interface of the link.'''
-        self.link_table[next_node].append(link)
-        interface_num = len(self.link_table[next_node]) - 1
+        self.interfaces[remoteip] = link
         remotemac = default_ip_to_macaddr(remoteip)
-        self.addStaticArpEntry(remoteip, remotemac, next_node, interface_num)
-        return interface_num
+        self.addStaticArpEntry(remoteip, remotemac, next_node)
+
 
     # def forward(self, next_node, flet, destination):
     #     '''forward a flowlet to next_node, on its way to destination'''

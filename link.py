@@ -16,18 +16,19 @@ class Link(object):
     '''
     Models a link in fs.
     '''
-    __slots__ = ['capacity', 'delay', 'egress_node', 'egress_port', 'egress_name', 
-                 'ingress_node', 'ingress_port', 'ingress_name', 'backlog', 'bdp',
-                 'queuealarm', 'lastalarm', 'alarminterval', 'doqdelay', 'logger' ]
+    __slots__ = ['capacity', 'delay', 'egress_node', 'egress_name', 
+                 'ingress_node', 'ingress_name', 'ingress_ip',
+                 'egress_ip', 'backlog', 'bdp', 'queuealarm', 'lastalarm', 
+                 'alarminterval', 'doqdelay', 'logger' ]
     def __init__(self, capacity, delay, ingress_node, egress_node):
         self.capacity = Link.parse_capacity(capacity)/8.0 # bytes/sec
         self.delay = Link.parse_delay(delay)
+        self.ingress_ip = 0
+        self.egress_ip = 0
         self.egress_node = egress_node
-        self.egress_port = -1
-        self.egress_name = Link.make_portname(self.egress_node.name, self.egress_port)
+        self.egress_name = Link.make_portname(self.egress_node.name, self.egress_ip)
         self.ingress_node = ingress_node
-        self.ingress_port = -1
-        self.ingress_name = Link.make_portname(self.ingress_node.name, self.ingress_port)
+        self.ingress_name = Link.make_portname(self.ingress_node.name, self.ingress_ip)
         self.backlog = 0
         self.bdp = self.capacity * self.delay  # bytes
         self.queuealarm = 1.0
@@ -92,23 +93,23 @@ class Link(object):
     @staticmethod
     def make_portname(node, port):
         '''
-        Make a canonical string representing a node/port pair (interface).
+        Make a canonical string representing a node/port (local ip address) pair.
         '''
         return "{}:{}".format(node, port)
 
-    def set_egress_port(self, endpoint):
+    def set_egress_ip(self, ip):
         '''
-        Set the egress port number of the 'link.
+        Set the egress ip address of the link.
         '''
-        self.egress_port = endpoint
-        self.egress_name = Link.make_portname(self.egress_node.name, self.egress_port)
+        self.egress_ip = ip
+        self.egress_name = Link.make_portname(self.egress_node.name, self.egress_ip)
 
-    def set_ingress_port(self, endpoint):
+    def set_ingress_ip(self, ip):
         '''
-        Set the ingress port number of the link.
+        Set the ingress ip address of the link.
         '''
-        self.ingress_port = endpoint
-        self.ingress_name = Link.make_portname(self.ingress_node.name, self.ingress_port)
+        self.ingress_ip = ip
+        self.ingress_name = Link.make_portname(self.ingress_node.name, self.ingress_ip)
 
     def decrbacklog(self, amt):
         '''
@@ -133,4 +134,4 @@ class Link(object):
                 self.logger.warn("Excessive backlog on link {}-{}({:3.2f} sec ({} bytes))".format(self.ingress_name, self.egress_name, queuedelay, self.backlog))
             fscore().after(wait, "link-decrbacklog-{}".format(self.egress_node.name), self.decrbacklog, flowlet.size)
 
-        fscore().after(wait, "link-flowarrival-{}".format(self.egress_name, self.egress_port), self.egress_node.flowlet_arrival, flowlet, prevnode, destnode, self.egress_port)
+        fscore().after(wait, "link-flowarrival-{}".format(self.egress_name, self.egress_ip), self.egress_node.flowlet_arrival, flowlet, prevnode, destnode, self.egress_ip)

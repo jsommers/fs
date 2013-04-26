@@ -351,7 +351,7 @@ class FsConfigurator(object):
             d['weight'] = int(w)
 
         self.nodes = {}
-        self.links = {}
+        self.links = defaultdict(list)
         self.traffic_modulators = []
 
         self.__configure_parallel_universe(measurement_config, measurement_nodes)
@@ -440,14 +440,16 @@ class FsConfigurator(object):
 
             linkfwd = Link(cap, delay, ra, rb)
             linkrev = Link(cap, delay, rb, ra)
-            aport = ra.add_link(linkfwd, ipa, ipb, b)
-            bport = rb.add_link(linkrev, ipb, ipa, a)
-            self.links[(a,aport,b,bport)] = linkfwd
-            self.links[(b,bport,a,aport)] = linkrev
-            linkfwd.set_ingress_port(aport)
-            linkfwd.set_egress_port(bport)
-            linkrev.set_ingress_port(bport)
-            linkrev.set_egress_port(aport)
+            self.logger.debug("Adding single dir link: {}, {}, {}, {}".format(str(linkfwd), ipa, ipb, b))
+            ra.add_link(linkfwd, ipa, ipb, rb.name)
+            self.logger.debug("Adding single dir link: {}, {}, {}, {}".format(str(linkrev), ipb, ipa, ra.name))
+            rb.add_link(linkrev, ipb, ipa, ra.name)
+            self.links[(a,b)].append( (linkfwd,ipa,ipb) )
+            self.links[(b,a)].append( (linkrev,ipb,ipa) )
+            linkfwd.set_ingress_ip(ipa)
+            linkfwd.set_egress_ip(ipb)
+            linkrev.set_ingress_ip(ipb)
+            linkrev.set_egress_ip(ipa)
 
     def __configure_traffic(self):
         for n,d in self.graph.nodes_iter(data=True):

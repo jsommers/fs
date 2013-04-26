@@ -11,6 +11,8 @@ import ipaddr
 import fscommon
 import fsutil
 import json
+from importlib import import_module
+
 
 from abc import ABCMeta, abstractmethod
 from networkx import single_source_dijkstra_path, single_source_dijkstra_path_length, read_gml, read_dot
@@ -515,15 +517,23 @@ class FsConfigurator(object):
 
         # first item in the trafspec list should be the traffic generator name.
         # also need to traverse the remainder of the and do substitutions for common configuration elements
-        tclass = trafspeclist[0].strip().lower().capitalize()
+        specname = trafspeclist[0].strip()
+        tclass = specname.capitalize()
         fulltrafspec = trafspeclist[1:]
         trafgenname = "{}TrafficGenerator".format(tclass)
 
-        if trafgenname not in dir(traffic):
+        try:
+            importname = "traffic_generators.{}".format(specname)
+            print "trying to import",importname
+            m = import_module(importname)
+        except ImportError,e:
+            raise InvalidTrafficSpecification(trafspec)
+
+        classobj = getattr(m, trafgenname)
+        if not classobj:
             self.logger.warn("Bad config: can't find TrafficGenerator class named {0}.  Add the class '{0}' to traffic.py, or fix the config.".format(trafgenname))
             raise InvalidTrafficSpecification(trafspec)
         else:
-            classobj = eval("traffic.{}".format(trafgenname))
             trafdict = fsutil.mkdict(fulltrafspec)
             self.logger.debug("Creating {} with specification {}".format(str(classobj),trafdict))
             gen = lambda: classobj(srcnode, **trafdict)

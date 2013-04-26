@@ -147,6 +147,8 @@ def main():
 
     sim = FsCore(options.interval, endtime=options.simtime, debug=options.debug)
     signal.signal(signal.SIGINT, sim.sighandler)
+    sys.path.append("./traffic_generators")
+    sys.path.append("./tcpmodels")
     sim.run(args[0], configonly=options.configonly)
 
 if __name__ == '__main__':

@@ -288,15 +288,6 @@ class Node(object):
         self.addStaticArpEntry(remoteip, remotemac, next_node)
 
 
-    # def forward(self, next_node, flet, destination):
-    #     '''forward a flowlet to next_node, on its way to destination'''
-    #     # FIXME: this does, effectively, ECMP for any parallel links, regardless
-    #     # of weight.  what's the right thing to do?
-    #     links = self.link_table[next_node]
-    #     port = hash(flet) % len(links)
-    #     links[port].flowlet_arrival(flet, self.name, destination)
-
-
 class ForwardingFailure(Exception):
     pass
 
@@ -306,46 +297,34 @@ class Router(Node):
     def __init__(self, name, measurement_config, **kwargs): 
         Node.__init__(self, name, measurement_config, **kwargs)
         self.autoack=kwargs.get('autoack',False)
-        self.forwarding_table = PyTricia()
+        self.forwarding_table = PyTricia(32)
 
     def addForwardingEntry(self, prefix, nexthop):
         '''Add new forwarding table entry to Node, given a destination prefix
            and a nexthop (node name)'''
         pstr = str(prefix)
-        xnode = None
-        if pstr in self.forwarding_table:
-            xnode = self.forwarding_table[pstr]
-        else:
-            xnode = {}
+        self.logger.debug("Adding forwarding table entry: {}->{}".format(pstr, nexthop))
+        xnode = self.forwarding_table.get(pstr, None)
+        if not xnode:
+            xnode = []
             self.forwarding_table[pstr] = xnode
-        xnode['net'] = prefix
-        dlist = xnode.get('dests', None)
-        if not dlist:
-            xnode['dests'] = [ nexthop ]
-        else:
-            if nexthop not in xnode['dests']:
-                xnode['dests'].append(ipaddr)
+        xnode.append(nexthop)
 
     def removeForwardingEntry(self, prefix, nexthop):
         '''Remove an entry from the Node forwarding table.'''
         pstr = str(prefix)
-        if pstr not in self.forwarding_table:
+        if not self.forwarding_table.has_key(pstr):
             return
-        xnode = self.forwarding_table[pstr]
-        dlist = xnode.get('dests', None)
-        if dlist:
-            # remove next hop entry.  if that was the last
-            # entry, remove the entire prefix from the table.
-            dlist.remove(nexthop)
-            if not dlist:
-                del self.forwarding_table[pstr]
+        xnode = self.forwarding_table.get(pstr)
+        xnode.remove(nexthop)
+        if not xnode:
+            del self.forwarding_table[pstr]
 
     def nextHop(self, destip):
         '''Return the next hop from the local forwarding table (next node, ipaddr), based on destination IP address (or prefix)'''
-        xnode = self.forwarding_table.get(str(destip), None)
-        if xnode:
-            dlist = xnode['dests']
-            return dlist[hash(destip) % len(dlist)]
+        xlist = self.forwarding_table.get(str(destip), None)
+        if xlist:
+            return xlist[hash(destip) % len(xlist)]
         raise ForwardingFailure()
 
     def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
@@ -361,9 +340,8 @@ class Router(Node):
                 del self.flow_table[kkey]
 
             if destnode != self.name:
-                nh = fscore().nexthop(self.name, destnode)
-                if nh:
-                    self.forward(nh, flowlet, destnode)
+                self.forward(flowlet, destnode)
+
             return
 
         else:
@@ -401,28 +379,18 @@ class Router(Node):
                     if revflow.endofflow:
                         self.unmeasure_flow(revflow, prevnode)
 
-
                     destnode = fscore().destnode(self.name, revflow.dstaddr)
 
                     # guard against case that we can't do the autoack due to
                     # no "real" source (i.e., source was spoofed or source addr
                     # has no route)
                     if destnode and destnode != self.name:
-                        nh = fscore().nexthop(self.name, destnode)
-                        if nh:
-                            self.forward(nh, revflow, destnode)
-                        else:
-                            self.logger.debug('No route from %s to %s (trying to run ackflow)' % (self.name, destnode))
-
+                        self.forward(revflow, destnode)
             else:
-                nextnode = self.nextHop(flowlet.dstaddr)                
-                link = self.linkFromNexthopNode(nextnode, flowkey=flowlet.key)
-                link.flowlet_arrival(flowlet, self.name, destnode)   
+                self.forward(flowlet, destnode)
 
-                # nh = fscore().topology.nexthop(self.name, destnode)
-                # assert (nh != self.name)
-                # if nh:
-                #     self.forward(nh, flowlet, destnode)
-                # else:
-                #     self.logger.debug('No route from %s to %s (in router nh decision; ignoring)' % (self.name, destnode))
+    def forward(self, flowlet, destnode):
+        nextnode = self.nextHop(flowlet.dstaddr)
+        link = self.linkFromNexthopNode(nextnode, flowkey=flowlet.key)
+        link.flowlet_arrival(flowlet, self.name, destnode)   
 

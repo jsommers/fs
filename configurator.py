@@ -42,7 +42,7 @@ class Topology(NullTopology):
         self.links = links
         self.traffic_modulators = traffic_modulators
         self.routing = {}
-        self.ipdestlpm = PyTricia()
+        self.ipdestlpm = None
         self.owdhash = {}
         self.__configure_routing()
 
@@ -80,7 +80,6 @@ class Topology(NullTopology):
         for n in self.graph:
             self.routing[n] = single_source_dijkstra_path(self.graph, n)
 
-
         if self.debug:
             for n,d in self.graph.nodes_iter(data=True):
                 print n,d
@@ -101,10 +100,13 @@ class Topology(NullTopology):
                     xnode['dests'] = [ n ]
 
         # install static forwarding table entries to each node
+
+        # FIXME: there's a problematic bit of code here that triggers
+        # pytricia-related (iterator) core dump
         for nodename,nodeobj in self.nodes.iteritems():
             if isinstance(nodeobj, Router):
-                for prefix in self.ipdestlpm:
-                    lpmnode = self.ipdestlpm[prefix] 
+                for prefix in self.ipdestlpm.keys():
+                    lpmnode = self.ipdestlpm.get(prefix)
                     if nodename not in lpmnode['dests']:
                         routes = self.routing[nodename]
                         for d in lpmnode['dests']:

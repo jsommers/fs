@@ -2,7 +2,7 @@
     "directed": false, 
     "graph": [
         ["node", {}], 
-        ["graph", {"flowexportfn": "text_export_factory"}], 
+        ["graph", {"flowexport": "text"}], 
         ["edge", {}], 
         ["name", "test"]], 
     "nodes": [

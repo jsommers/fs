@@ -149,6 +149,7 @@ def main():
     signal.signal(signal.SIGINT, sim.sighandler)
     sys.path.append("./traffic_generators")
     sys.path.append("./tcpmodels")
+    sys.path.append("./flowexport")
     sim.run(args[0], configonly=options.configonly)
 
 if __name__ == '__main__':

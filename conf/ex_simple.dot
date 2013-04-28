@@ -1,6 +1,6 @@
 graph test {
     // 3 nodes: a, b, and c
-    flowexportfn=text_export_factory
+    flowexport=text
     counterexportfile="counters"
     flowsampling=1.0
     pktsampling=1.0

@@ -25,6 +25,9 @@ class InvalidTrafficSpecification(Exception):
 class InvalidRoutingConfiguration(Exception):
     pass
 
+class InvalidConfiguration(Exception):
+    pass
+
 class NullTopology(object):
     ___metaclass__ = ABCMeta
     @abstractmethod
@@ -330,7 +333,7 @@ class FsConfigurator(object):
             self.logger.error("Error reading configuration: {}".format(str(e)))
             sys.exit(-1)
          
-        mconfig_dict = {'counterexport':False, 'flowexportfn':'null_export_factory','counterexportinterval':0, 'counterexportfile':None, 'maintenance_cycle':60, 'pktsampling':1.0, 'flowsampling':1.0, 'longflowtmo':-1, 'flowinactivetmo':-1}
+        mconfig_dict = {'counterexport':False, 'flowexport':'null','counterexportinterval':0, 'counterexportfile':None, 'maintenance_cycle':60, 'pktsampling':1.0, 'flowsampling':1.0, 'longflowtmo':-1, 'flowinactivetmo':-1}
 
         print "Reading config for graph {}.".format(self.graph.graph.get('name','(unnamed)'))
 
@@ -344,6 +347,13 @@ class FsConfigurator(object):
             if key in ['measurenodes','measurementnodes','measurements']:
                 if val != 'all':
                     measurement_nodes = [ n.strip() for n in val.split() ]
+
+        try:
+            # test importing the flow export module before we get too far...
+            import_module("flowexport.{}export".format(mconfig_dict['flowexport']))
+        except ImportError,e:
+            s = "No such flow exporter {0} (module flowexport.{0}export doesn't exist.".format(mconfig_dict['flowexport'])
+            raise InvalidConfiguration(s)
 
         measurement_config = MeasurementConfig(**mconfig_dict)
         print "Running measurements on these nodes: <{}>".format(','.join(measurement_nodes))
@@ -524,7 +534,6 @@ class FsConfigurator(object):
 
         try:
             importname = "traffic_generators.{}".format(specname)
-            print "trying to import",importname
             m = import_module(importname)
         except ImportError,e:
             raise InvalidTrafficSpecification(trafspec)

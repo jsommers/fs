@@ -1,7 +1,7 @@
 graph test {
     // global settings for measurements
     counterexportfile="counters"
-    flowexportfn=text_export_factory
+    flowexport=text
     flowsampling=1.0
     pktsampling=1.0
     exportcycle=60

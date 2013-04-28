@@ -3,12 +3,12 @@
 __author__ = 'jsommers@colgate.edu'
 
 from abc import ABCMeta, abstractmethod
+from importlib import import_module
 import logging
 from random import random
 import copy
 from flowlet import *
 from collections import Counter, defaultdict
-from flowexport import null_export_factory, text_export_factory, cflowd_export_factory
 import copy
 import networkx
 from pytricia import PyTricia
@@ -17,10 +17,10 @@ from fscommon import *
 from fsutil import default_ip_to_macaddr, subnet_generator
 
 class MeasurementConfig(object):
-    __slots__ = ['__counterexport','__exportfn','__exportinterval','__exportfile','__pktsampling','__flowsampling','__maintenance_cycle','__longflowtmo','__flowinactivetmo','__clockbase']
+    __slots__ = ['__counterexport','__exporttype','__exportinterval','__exportfile','__pktsampling','__flowsampling','__maintenance_cycle','__longflowtmo','__flowinactivetmo','__clockbase']
     def __init__(self, **kwargs):
         self.__counterexport = bool(kwargs.get('counterexport',False))
-        self.__exportfn = eval(kwargs.get('flowexportfn','null_export_factory'))
+        self.__exporttype = kwargs.get('flowexport','null')
         self.__exportinterval = int(kwargs.get('counterexportinterval',1))
         self.__exportfile = kwargs.get('counterexportfile',None)
         self.__pktsampling = float(kwargs.get('pktsampling',1.0))
@@ -37,8 +37,15 @@ class MeasurementConfig(object):
         return self.__counterexport
 
     @property
-    def exportfn(self):
-        return self.__exportfn
+    def exporttype(self):
+        return self.__exporttype
+
+    def exportclass(self):
+        '''Based on exporter name, return the class object that can be
+        used to instantiate actual flow exporter objects'''
+        mod = import_module("flowexport.{}export".format(self.exporttype))
+        cls = getattr(mod, "{}Exporter".format(self.exporttype.capitalize()))
+        return cls
 
     @property 
     def exportinterval(self):
@@ -73,7 +80,7 @@ class MeasurementConfig(object):
         return self.__clockbase
 
     def __str__(self):
-        return 'MeasurementConfig <{}, {}, {}>'.format(str(self.exportfn), str(self.counterexport), self.exportfile)
+        return 'MeasurementConfig <{}, {}, {}>'.format(str(self.exporttype), str(self.counterexport), self.exportfile)
 
 
 class NullMeasurement(object):
@@ -99,7 +106,7 @@ class NodeMeasurement(NullMeasurement):
         self.flow_table = {}
         self.counters = defaultdict(Counter)
         self.counter_exportfh = None
-        self.exporter = self.config.exportfn(node_name)
+        self.exporter = self.config.exportclass()(node_name)
 
     def start(self):
         # start router maintenance loop at random within first 10 seconds

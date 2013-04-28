@@ -6,8 +6,6 @@ import random
 from ipaddr import IPv4Network, IPv4Address
 import math 
 
-logformat='%(asctime)s %(name)-5s %(levelname)-8s %(message)s'
-
 def zipit(xtup):
     assert(len(xtup) == 2)
     a = list(xtup[0])

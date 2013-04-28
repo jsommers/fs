@@ -1,6 +1,6 @@
 graph test {
     // 3 nodes: a, b, and c
-    flowexportfn=text_export_factory
+    flowexport=text
     usewallclock=True
     counterexport=True
     counterexportinterval=1

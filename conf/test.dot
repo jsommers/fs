@@ -1,5 +1,5 @@
 graph test {
-    flowexportfn=text_export_factory
+    flowexport=text
 
     // nodes
 

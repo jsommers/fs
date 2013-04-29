@@ -1,5 +1,5 @@
 from trafgen import TrafficGenerator
-from fscommon import fscore
+from fslib.fscommon import fscore
 
 class SubtractiveTrafficGenerator(TrafficGenerator):
     def __init__(self, srcnode, dstnode=None, action=None, ipdstfilt=None,

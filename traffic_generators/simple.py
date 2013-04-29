@@ -1,4 +1,5 @@
 from trafgen import TrafficGenerator
+from fslib.util import *
 
 class SimpleTrafficGenerator(TrafficGenerator):
 

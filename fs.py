@@ -11,8 +11,8 @@ import signal
 import os.path
 from optparse import OptionParser
 from heapq import heappush, heappop
-import configurator 
-import fscommon
+from fslib.configurator import NullTopology, FsConfigurator
+from fslib.fscommon import get_logger, set_fscore
 import random
 
 
@@ -24,22 +24,21 @@ class FsCore(object):
 
     def __init__(self, interval, endtime=1.0, debug=False, progtick=0.05):
         if FsCore.inited:
-            fscommon.get_logger().warn(
-                    "Trying to initialize a new simulation object.")
+            get_logger().warn("Trying to initialize a new simulation object.")
             sys.exit(-1)
 
         self.__debug = debug
         self.__interval = interval
         self.__now = 0.0
-        self.__logger = fscommon.get_logger(debug)
+        self.__logger = get_logger(debug)
 
         self.__heap = []
         self.endtime = endtime
         self.starttime = self.__now
         self.intr = False
         self.progtick = progtick
-        self.__topology = configurator.NullTopology()
-        fscommon.set_fscore(self)
+        self.__topology = NullTopology()
+        set_fscore(self)
 
     def progress(self):
         '''Callback for printing simulation timeline progress'''
@@ -89,7 +88,7 @@ class FsCore(object):
 
     def run(self, scenario, configonly=False):
         '''Start the simulation using a particular scenario filename'''
-        cfg = configurator.FsConfigurator(self.debug)
+        cfg = FsConfigurator(self.debug)
         if scenario:
             root, ext = os.path.splitext(scenario)
             self.__topology = cfg.load_config(scenario, configtype=ext[1:])
@@ -147,9 +146,7 @@ def main():
 
     sim = FsCore(options.interval, endtime=options.simtime, debug=options.debug)
     signal.signal(signal.SIGINT, sim.sighandler)
-    sys.path.append("./traffic_generators")
-    sys.path.append("./tcpmodels")
-    sys.path.append("./flowexport")
+    sys.path.append(".")
     sim.run(args[0], configonly=options.configonly)
 
 if __name__ == '__main__':

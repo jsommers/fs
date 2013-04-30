@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from fslib.fscommon import fscore, get_logger
+from fslib.common import fscore, get_logger
 
 class TrafficGenerator(object):
     __metaclass__ = ABCMeta

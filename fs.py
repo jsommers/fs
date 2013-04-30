@@ -12,7 +12,7 @@ import os.path
 from optparse import OptionParser
 from heapq import heappush, heappop
 from fslib.configurator import NullTopology, FsConfigurator
-from fslib.fscommon import get_logger, set_fscore
+from fslib.common import get_logger, set_fscore
 import random
 
 

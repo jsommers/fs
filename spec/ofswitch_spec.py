@@ -1,7 +1,7 @@
 import unittest
 from mock import Mock
 
-from flowlet import FlowIdent, Flowlet, SubtractiveFlowlet, OpenflowMessage, ofp_match_from_flowlet
+from fslib.flowlet import FlowIdent, Flowlet, SubtractiveFlowlet, OpenflowMessage, ofp_match_from_flowlet
 from pox.openflow.flow_table import SwitchFlowTable, TableEntry
 import pox.openflow.libopenflow_01 as poxof
 from node import *

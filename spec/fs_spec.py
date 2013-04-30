@@ -2,7 +2,7 @@ import unittest
 from mock import Mock
 
 from fs import *
-from fscommon import fscore
+from fslib.common import fscore
 
 class SimTests(unittest.TestCase):
     def testNewSimulatorSingleton(self):

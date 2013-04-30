@@ -1,7 +1,7 @@
 import unittest
 from mock import MagicMock, Mock
 
-from flowlet import FlowIdent, Flowlet, SubtractiveFlowlet, OpenflowMessage
+from fslib.flowlet import FlowIdent, Flowlet, SubtractiveFlowlet, OpenflowMessage
 import ipaddr
 import time
 import copy

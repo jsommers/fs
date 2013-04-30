@@ -1,7 +1,7 @@
 import unittest
 from mock import Mock
 
-from flowlet import *
+from fslib.flowlet import *
 
 import pox.openflow.of_01 
 # import pox.openflow.spanning_tree

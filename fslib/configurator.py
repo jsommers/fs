@@ -10,7 +10,7 @@ import ipaddr
 from pytricia import PyTricia
 from fslib.node import *
 from fslib.link import Link
-from fslib.fscommon import get_logger
+from fslib.common import get_logger
 from fslib.traffic import FlowEventGenModulator
 import fslib.util as fsutil
 

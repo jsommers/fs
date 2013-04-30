@@ -13,7 +13,7 @@ import copy
 import networkx
 from pytricia import PyTricia
 import time
-from fslib.fscommon import *
+from fslib.common import *
 from fslib.util import default_ip_to_macaddr, subnet_generator
 
 class MeasurementConfig(object):

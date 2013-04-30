@@ -10,7 +10,7 @@ __author__ = 'jsommers@colgate.edu'
 
 import sys
 import re
-from fscommon import get_logger, fscore
+from fslib.common import get_logger, fscore
 
 class Link(object):
     '''

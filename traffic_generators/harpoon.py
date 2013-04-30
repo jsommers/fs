@@ -1,7 +1,7 @@
 from trafgen import TrafficGenerator
 import socket
 import ipaddr
-from fslib.fscommon import fscore
+from fslib.common import fscore
 from fslib.flowlet import Flowlet, FlowIdent
 from copy import copy
 from importlib import import_module

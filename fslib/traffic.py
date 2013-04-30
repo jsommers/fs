@@ -3,7 +3,7 @@
 __author__ = 'jsommers@colgate.edu'
 
 import random
-from fscommon import fscore, get_logger
+from fslib.common import fscore, get_logger
 from fslib.util import *
 
 

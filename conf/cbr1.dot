@@ -1,4 +1,3 @@
-
 graph test {
     // global settings for measurements
     counterexportfile="counters"
@@ -54,5 +53,5 @@ graph test {
 
         tail -- controller [ capacity=1000000000, delay=0.01 ]
 
-    }
+}
     

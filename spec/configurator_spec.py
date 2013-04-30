@@ -1,7 +1,7 @@
 import unittest
 from mock import Mock
 import tempfile
-import fslib.configurator
+import fslib.configurator as configurator
 import os
 
 # dry out configuration stuff

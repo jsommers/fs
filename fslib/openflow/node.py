@@ -1,3 +1,14 @@
+from copy import deepcopy
+
+from fslib.node import Node
+from fslib.common import fscore, get_logger
+from ofmessage import *
+
+import networkx
+
+from pox.openflow.flow_table import SwitchFlowTable
+from pox.openflow.libopenflow_01 import *
+
 class UnhandledOpenflowMessage(Exception):
     pass
 
@@ -16,11 +27,12 @@ class FsSwitchFlowTable(SwitchFlowTable):
         return None
 
 class OpenflowSwitch(Node):
-    __slots__ = ['flow_table']
+    __slots__ = ['flow_table','controller']
 
     def __init__(self, name, measurement_config, **kwargs):
         Node.__init__(self, name, measurement_config, **kwargs)
         self.flow_table = FsSwitchFlowTable()
+        self.controller =  kwargs.get('controller','controller')
 
     def apply_actions(self, flowlet, actions):
         nh = None
@@ -81,7 +93,8 @@ class OpenflowSwitch(Node):
 
             # FIXME: controller name is hard-coded.  need a general way to identify
             # the link to/name of the controller node
-            self.forward('controller', msg, 'controller')
+            self.forward(self.controller, msg, self.controller)
+
         fscore().after(1, "openflow-switch-table-ager"+str(self.name), self.table_ager)
         return len(entries)
 
@@ -142,10 +155,17 @@ class OpenflowSwitch(Node):
                 ofm = OpenflowMessage(flowlet.flowident, 'ofp_packet_in', in_port=prevnode, reason=0)
                 ofm.data = flowlet                
                 ofm.set_context(self.name, destnode, prevnode)
-                self.forward('controller', ofm, 'controller')
+                self.forward(self.controller, ofm, self.controller)
+
                 nexthop = 'controller'
 
         return nexthop
+
+    def forward(self, nextnode, message, destnode):
+        link = self.linkFromNexthopNode(nextnode)
+        link.flowlet_arrival(message, self.name, destnode)
+
+        
 
 TIMEOUT = 60*2
 
@@ -178,10 +198,11 @@ class L3Learning(ControllerModule):
     3) When you see an IP packet, if you know the destination port (because it's
     in the table from step 1), install a flow for it.
     """
-    def __init__ (self):
+    def __init__ (self, node):
         # For each switch, we map IP addresses to Entries
         ControllerModule.__init__(self)
         self.ipTable = {}
+        self.node = node
 
     def handlePacketIn(self, flet, prevnode):
         dpid = prevnode
@@ -229,8 +250,9 @@ class Hub(ControllerModule):
     """
     Turns your complex OpenFlow switches into stupid hubs.
     """
-    def __init__(self):
+    def __init__(self, node):
         ControllerModule.__init__(self)
+        self.node = node
 
     def handlePacketIn (self, flet, prevnode):
         # No need to set idle and hard timeouts as hub floods flowlets to all the ports
@@ -245,12 +267,13 @@ class L2PairsSwitch(object):
     A super simple OpenFlow learning switch that installs rules for
     each pair of L2 addresses.
     """
-    def __init__(self):
+    def __init__(self, node):
         # This table maps (switch,MAC-addr) pairs to the port on 'switch' at
         # which we last saw a packet *from* 'MAC-addr'.
         # (In this case, we use a Switch name for the switch.)
         ControllerModule.__init__(self)
         self.table = {}
+        self.node = node
 
     # Handle messages the switch has sent us because it has no
     # matching rule.
@@ -320,10 +343,11 @@ class L2LearningSwitch(ControllerModule):
     flow goes out the appopriate port
     6a) Send the packet out appropriate port
     """
-    def __init__(self, transparent = False):
+    def __init__(self, node, transparent = False):
         ControllerModule.__init__(self)
         self.macToPort = {}
         self.transparent = transparent
+        self.node = node
 
     def handlePacketIn (self, flet, prevnode):
         """
@@ -389,20 +413,21 @@ class L2LearningSwitch(ControllerModule):
 
 
 class L3ShortestPaths(ControllerModule):
-    def __init__(self):
+    def __init__(self, node):
         ControllerModule.__init__(self)
         self.logger = get_logger()
         self.graph = None
+        self.node = node
 
     def handlePacketIn (self, flet, prevnode):
         if not self.graph:
-            self.graph = copy.deepcopy(fscore().graph)
-            self.graph.remove_node('controller')
+            self.graph = deepcopy(fscore().topology.graph)
+            self.graph.remove_node(self.node.name)
             # FIXME: ignores weights!
             self.shortest_paths = networkx.shortest_path(self.graph)
 
         origin,dest,prev = flet.get_context()
-        destnode = fscore().destnode(origin, flet.dstaddr)
+        destnode = fscore().topology.destnode(origin, flet.dstaddr)
         
         path = self.shortest_paths[origin][dest]
         nh = path[1] 
@@ -418,18 +443,18 @@ class OpenflowController(Node):
 
     def __init__(self, name, measurement_config, **kwargs):
         Node.__init__(self, name, measurement_config, **kwargs)
-        if 'forwarding' in kwargs:
-            self.forwarding = kwargs['forwarding']
+        if 'components' in kwargs:
+            self.forwarding = kwargs['components']
             if (self.forwarding == 'l2_learning'):
-                self.forwardingSwitch = L2LearningSwitch()
+                self.forwardingSwitch = L2LearningSwitch(self)
             elif (self.forwarding == 'l2_pairs'):
-                self.forwardingSwitch = L2PairsSwitch()
+                self.forwardingSwitch = L2PairsSwitch(self)
             elif (self.forwarding == 'hub'):
-                self.forwardingSwitch = Hub()
+                self.forwardingSwitch = Hub(self)
             elif (self.forwarding == 'l3_learning'):
-                self.forwardingSwitch = L3Learning()
+                self.forwardingSwitch = L3Learning(self)
             elif (self.forwarding == 'shortest_paths'):
-                self.forwardingSwitch = L3ShortestPaths()
+                self.forwardingSwitch = L3ShortestPaths(self)
 
     def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
         if isinstance(flowlet, OpenflowMessage):
@@ -458,3 +483,6 @@ class OpenflowController(Node):
             # this should never happen; the controller should *only* receive OpenflowMessage instances
             raise UnhandledOpenflowMessage("Got non-OpenflowMessage in controller.  Bad stuff.")
             
+    def forward(self, nextnode, message, destnode):
+        link = self.linkFromNexthopNode(nextnode)
+        link.flowlet_arrival(message, self.name, destnode)

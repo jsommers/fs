@@ -386,26 +386,22 @@ class FsConfigurator(object):
     def __addupd_router(self, rname, rdict, measurement_config):
         robj = None
         forwarding = None
-        # typehash = {'iprouter':Router, 'ofswitch':OpenflowSwitch, 'ofcontroller':OpenflowController}
-        typehash = {'iprouter':Router}
         if rname not in self.nodes:
-            aa = False
-            if 'autoack' in rdict:
-                aa = rdict['autoack']
-                if isinstance(aa, (str,unicode)):
-                    aa = eval(aa)
-            classtype = rdict.get('type','iprouter') # node defaults to being an iprouter
-            # Checking if controller then find out the forwarding technique to be used
-            forwarding=None
-            if classtype == 'ofcontroller':
-                forwarding = rdict.get('forwarding')
-
+            ctype = rdict.get('type', 'Router')
             if self.debug:
-                self.logger.debug('Adding router {}, {}, autoack={}'.format(rname,rdict,aa))
+                self.logger.debug('Adding node {} type {} config {}'.format(rname,ctype,rdict))
 
-            if classtype not in typehash:
-                raise InvalidTrafficSpecification('Unrecognized node type {}.'.format(classtype))
-            robj = typehash[classtype](rname, measurement_config, autoack=aa, forwarding=forwarding)
+            # ctype is the ClassName of the node to construct.
+            # the class may be in fslib.node or fslib.openflow.node
+
+            m = import_module("fslib.node")
+            cls = getattr(m, ctype, None)
+            if not cls:
+                m = import_module("fslib.openflow.node")
+                cls = getattr(m, ctype, None)
+                if not cls:
+                    raise InvalidTrafficSpecification('Unrecognized node type {}.'.format(ctype))
+            robj = cls(rname, measurement_config, **rdict)
             self.nodes[rname] = robj
         else:
             robj = self.nodes[rname]

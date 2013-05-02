@@ -1,5 +1,13 @@
 from trafgen import TrafficGenerator
 from fslib.util import *
+from ipaddr import IPAddress, IPNetwork
+from socket import IPPROTO_UDP, IPPROTO_TCP, IPPROTO_ICMP
+from fslib.flowlet import Flowlet, FlowIdent
+from fslib.common import fscore
+
+
+# FIXME
+haveIPAddrGen = False
 
 class SimpleTrafficGenerator(TrafficGenerator):
 
@@ -10,8 +18,8 @@ class SimpleTrafficGenerator(TrafficGenerator):
         TrafficGenerator.__init__(self, srcnode)
         # assume that all keyword params arrive as strings
         # print ipsrc,ipdst
-        self.ipsrc = ipaddr.IPNetwork(ipsrc)
-        self.ipdst = ipaddr.IPNetwork(ipdst)
+        self.ipsrc = IPNetwork(ipsrc)
+        self.ipdst = IPNetwork(ipdst)
         if haveIPAddrGen:
             self.ipsrcgen = ipaddrgen.initialize_trie(int(self.ipsrc), self.ipsrc.prefixlen, 0.61)
             self.ipdstgen = ipaddrgen.initialize_trie(int(self.ipdst), self.ipdst.prefixlen, 0.61)
@@ -29,11 +37,11 @@ class SimpleTrafficGenerator(TrafficGenerator):
             self.ipproto = int(ipproto)
         except:
             if ipproto == 'tcp':
-                self.ipproto = socket.IPPROTO_TCP
+                self.ipproto = IPPROTO_TCP
             elif ipproto == 'udp':
-                self.ipproto = socket.IPPROTO_UDP
+                self.ipproto = IPPROTO_UDP
             elif ipproto == 'icmp':
-                self.ipproto = socket.IPPROTO_ICMP
+                self.ipproto = IPPROTO_ICMP
             else:
                 raise InvalidFlowConfiguration('Unrecognized protocol:'+str(ipproto))
 
@@ -45,7 +53,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
             elif isinstance(iptos, (str,unicode)):
                 self.iptos = eval(iptos)
    
-        if self.ipproto == socket.IPPROTO_ICMP:
+        if self.ipproto == IPPROTO_ICMP:
             xicmptype = xicmpcode = 0
             if icmptype:
                 xicmptype = eval(icmptype)
@@ -57,7 +65,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
                 xicmpcode = randomchoice(xicmpcode)
             self.icmptype = xicmptype
             self.icmpcode = xicmpcode
-        elif self.ipproto == socket.IPPROTO_UDP or self.ipproto == socket.IPPROTO_TCP:
+        elif self.ipproto == IPPROTO_UDP or self.ipproto == IPPROTO_TCP:
             self.dport = eval(dport)
             if isinstance(self.dport, int):
                 self.dport = randomchoice(self.dport)
@@ -65,7 +73,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
             if isinstance(self.sport, int):
                 self.sport = randomchoice(self.sport)
             # print 'sport,dport',self.sport, self.dport
-            if self.ipproto == socket.IPPROTO_TCP:
+            if self.ipproto == IPPROTO_TCP:
                 self.tcpflags = randomchoice('')
                 if tcpflags:
                     if re.search('\(\S+\)', tcpflags):
@@ -129,15 +137,15 @@ class SimpleTrafficGenerator(TrafficGenerator):
 
     def __makeflow(self):
         if haveIPAddrGen:
-            srcip = str(ipaddr.IPv4Address(ipaddrgen.generate_addressv4(self.ipsrcgen)))
-            dstip = str(ipaddr.IPv4Address(ipaddrgen.generate_addressv4(self.ipdstgen)))
+            srcip = str(IPv4Address(ipaddrgen.generate_addressv4(self.ipsrcgen)))
+            dstip = str(IPv4Address(ipaddrgen.generate_addressv4(self.ipdstgen)))
         else:
-            srcip = str(ipaddr.IPAddress(int(self.ipsrc) + random.randint(0,self.ipsrc.numhosts-1)))
-            dstip = str(ipaddr.IPAddress(int(self.ipdst) + random.randint(0,self.ipdst.numhosts-1)))
+            srcip = str(IPAddress(int(self.ipsrc) + random.randint(0,self.ipsrc.numhosts-1)))
+            dstip = str(IPAddress(int(self.ipdst) + random.randint(0,self.ipdst.numhosts-1)))
 
         ipproto = self.ipproto
         sport = dport = 0
-        if ipproto == socket.IPPROTO_ICMP:
+        if ipproto == IPPROTO_ICMP:
             # std way that netflow encodes icmp type/code:
             # type in high-order byte of dport, 
             # code in low-order byte
@@ -157,8 +165,9 @@ class SimpleTrafficGenerator(TrafficGenerator):
 
         flet = Flowlet(FlowIdent(srcip, dstip, ipproto, sport, dport, srcmac, dstmac))
         flet.iptos = next(self.iptos)
+        flet.flowstart = flet.flowend = fscore().now
 
-        if flet.ipproto == socket.IPPROTO_TCP:
+        if flet.ipproto == IPPROTO_TCP:
             flet.ackflow = not self.autoack
 
             tcpflags = next(self.tcpflags)
@@ -200,11 +209,14 @@ class SimpleTrafficGenerator(TrafficGenerator):
         else:
             f.pkts = next(self.pkts)
 
-        fscore().node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, 'host')
+        fscore().topology.node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, 'host')
+
         ticks -= 1
         fscore().after(xinterval, 'rawflow-flowemit-'+str(self.srcnode), self.flowemit, flowlet, destnode, xinterval, ticks)
 
-       
+    def start(self):
+        self.callback()
+        
     def callback(self):
         f = self.__makeflow()
         f.bytes = next(self.bytes)
@@ -217,7 +229,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
             f.pkts = next(self.pkts)
 
 
-        destnode = fscore().destnode(self.srcnode, f.dstaddr)
+        destnode = fscore().topology.destnode(self.srcnode, f.dstaddr)
 
         # print 'rawflow:',f
         # print 'destnode:',destnode
@@ -243,7 +255,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
         # print 'xinterval',xinterval
 
         if not ticks or ticks == 1:
-            fscore().node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, 'host')
+            fscore().topology.node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, 'host')
         else:
             fscore().after(0, "rawflow-flowemit-{}".format(self.srcnode), self.flowemit, f, destnode, xinterval, ticks)
       

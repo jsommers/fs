@@ -15,6 +15,7 @@ from pytricia import PyTricia
 import time
 from fslib.common import *
 from fslib.util import default_ip_to_macaddr, subnet_generator
+from socket import IPPROTO_TCP
 
 class MeasurementConfig(object):
     __slots__ = ['__counterexport','__exporttype','__exportinterval','__exportfile','__pktsampling','__flowsampling','__maintenance_cycle','__longflowtmo','__flowinactivetmo','__clockbase']
@@ -359,7 +360,7 @@ class Router(Node):
                 self.unmeasure_flow(flowlet, prevnode)
 
             if destnode == self.name:
-                if self.autoack and flowlet.ipproto == socket.IPPROTO_TCP and not flowlet.ackflow:
+                if self.autoack and flowlet.ipproto == IPPROTO_TCP and not flowlet.ackflow:
                     revflow = Flowlet(flowlet.flowident.mkreverse())
                     
                     revflow.ackflow = True
@@ -386,7 +387,7 @@ class Router(Node):
                     if revflow.endofflow:
                         self.unmeasure_flow(revflow, prevnode)
 
-                    destnode = fscore().destnode(self.name, revflow.dstaddr)
+                    destnode = fscore().topology.destnode(self.name, revflow.dstaddr)
 
                     # guard against case that we can't do the autoack due to
                     # no "real" source (i.e., source was spoofed or source addr

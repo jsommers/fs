@@ -13,7 +13,8 @@ graph test {
 
 
     head [ 
-        type="ofswitch"
+        type="OpenflowSwitch"
+        controller="controllerx"
         autoack="False"
         ipdests="10.1.0.0/16"
         traffic="m1"
@@ -24,34 +25,31 @@ graph test {
 
         // udp vbr flows 
         m1="modulator start=0 generator=s1 profile=((3600,),(1,))"
-        s1="rawflow ipsrc=10.1.1.0/24 ipdst=10.3.1.0/24 flowlets=1 dport=randomunifint(1024,65535) sport=randomunifint(1024,65535) ipproto=udp pkts=randomchoice(8333) bytes=randomchoice(12500000) continuous=True fps=1"
+        s1="simple ipsrc=10.1.1.0/24 ipdst=10.3.1.0/24 flowlets=1 dport=randomunifint(1024,65535) sport=randomunifint(1024,65535) ipproto=udp pkts=randomchoice(8333) bytes=randomchoice(12500000) continuous=True fps=1"
     ];
 
     tail [ 
-        type="ofswitch"
+        type="OpenflowSwitch"
+        controller="controllerx"
         autoack="False"
         ipdests="10.3.0.0/16 10.4.0.0/16 10.0.0.0/8" 
     ];
 
-    controller [
-        type="ofcontroller"
-	    forwarding="shortest_paths"
+    controllerx [
+        type="OpenflowController"
+	components="shortest_paths"
     ];
 
     a [
-        type="ofswitch"
+        type="OpenflowSwitch"
+        controller="controllerx"
         autoack="False"
     ]
 
-        head -- a [weight=10, capacity=1000000000, delay=0.01 ];
-
-        head -- controller [ capacity=1000000000, delay=0.01 ]
-
-        a -- tail [weight=10, capacity=1000000000, delay=0.01 ];
-
-        a -- controller [ capacity=1000000000, delay=0.01 ]
-
-        tail -- controller [ capacity=1000000000, delay=0.01 ]
-
+    head -- a [weight=10, capacity=1000000000, delay=0.01 ];
+    head -- controllerx [ capacity=1000000000, delay=0.01 ]
+    a -- tail [weight=10, capacity=1000000000, delay=0.01 ];
+    a -- controllerx [ capacity=1000000000, delay=0.01 ]
+    tail -- controllerx [ capacity=1000000000, delay=0.01 ]
 }
     

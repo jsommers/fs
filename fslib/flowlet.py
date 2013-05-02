@@ -212,7 +212,7 @@ class Flowlet(object):
     @flowend.setter
     def flowend(self, fend):
         if fend < 0 or fend < self.flowstart:
-            raise InvalidFlowletTimestamps()
+            raise InvalidFlowletTimestamps(self.__str__())
         self.__flowend = fend
 
     def __cmp__(self, other):

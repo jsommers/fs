@@ -1,6 +1,6 @@
 from pox.openflow.libopenflow_01 import ofp_match
 import pox.openflow.libopenflow_01 as of
-from fslib.flowlet import Flowlet
+from fslib.flowlet import Flowlet, FlowIdent
 
 # Wrapper Class around POX for openflow messages
 class ofp_pox_messages:

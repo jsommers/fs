@@ -2,7 +2,7 @@ from copy import deepcopy
 
 from fslib.node import Node
 from fslib.common import fscore, get_logger
-from ofmessage import *
+from ofmessage_v1 import *
 
 import networkx
 

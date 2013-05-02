@@ -392,12 +392,12 @@ class FsConfigurator(object):
                 self.logger.debug('Adding node {} type {} config {}'.format(rname,ctype,rdict))
 
             # ctype is the ClassName of the node to construct.
-            # the class may be in fslib.node or fslib.openflow.node
+            # the class may be in fslib.node or fslib.openflow
 
             m = import_module("fslib.node")
             cls = getattr(m, ctype, None)
             if not cls:
-                m = import_module("fslib.openflow.node")
+                m = import_module("fslib.openflow")
                 cls = getattr(m, ctype, None)
                 if not cls:
                     raise InvalidTrafficSpecification('Unrecognized node type {}.'.format(ctype))

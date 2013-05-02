@@ -10,3 +10,5 @@
 ** Tue Apr 30 11:10:21 2013: 2.7.3 (3eef596df459, Apr 06 2013, 09:50:58)[PyPy 2.0.0-beta2 with GCC 4.2.1] Darwin:milky.colgate.edu:12.3.0:Darwin Kernel Version 12.3.0: Sun Jan  6 22:37:10 PST 2013; root:xnu-2050.22.13~1/RELEASE_X86_64:x86_64 16.279
 ** Tue Apr 30 11:10:39 2013: 2.7.3 (3eef596df459, Apr 06 2013, 09:50:58)[PyPy 2.0.0-beta2 with GCC 4.2.1] Darwin:milky.colgate.edu:12.3.0:Darwin Kernel Version 12.3.0: Sun Jan  6 22:37:10 PST 2013; root:xnu-2050.22.13~1/RELEASE_X86_64:x86_64 16.283
 ** Tue Apr 30 11:10:58 2013: 2.7.3 (3eef596df459, Apr 06 2013, 09:50:58)[PyPy 2.0.0-beta2 with GCC 4.2.1] Darwin:milky.colgate.edu:12.3.0:Darwin Kernel Version 12.3.0: Sun Jan  6 22:37:10 PST 2013; root:xnu-2050.22.13~1/RELEASE_X86_64:x86_64 16.504
+** Thu May  2 13:25:27 2013: 2.7.3 (7e4f0faa3d51, Nov 16 2012, 16:56:51)[PyPy 2.0.0-beta1 with GCC 4.4.3] Linux:clab:3.2.0-40-generic-pae:#64-Ubuntu SMP Mon Mar 25 21:44:41 UTC 2013:i686 16.152
+** Thu May  2 13:26:14 2013: 2.7.3 (7e4f0faa3d51, Nov 16 2012, 16:56:51)[PyPy 2.0.0-beta1 with GCC 4.4.3] Linux:clab:3.2.0-40-generic-pae:#64-Ubuntu SMP Mon Mar 25 21:44:41 UTC 2013:i686 15.692

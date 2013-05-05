@@ -6,6 +6,11 @@ TCP throughput models to drive the simulation.
 
 FS is made available under terms of the GPLv2.
 
+Note: the originally released version of fs (as described in the INFOCOM '11)
+research paper is on branch fs-orig.  The master branch is completely revamped
+and includes the fs-sdn code as described in a forthcoming HotSDN paper (fs-sdn).
+Better (any) documentation is coming.
+
 # Building fs
 
 FS is implemented in Python and has a few external module dependencies:
@@ -23,8 +28,6 @@ To install all the above, see the requirements.txt file here and use pip:
 
 I'd recommend using virtualenv, then installing the packages inside
 the venv.  See http://pypi.python.org/pypi/virtualenv.
-
-Better documentation will be added as time permits.
 
 ----------
 

@@ -10,7 +10,7 @@ import sys
 import signal
 import os.path
 from optparse import OptionParser
-from heapq import heappush, heappop
+from heapq import heappush, heappop, heapify
 from fslib.configurator import NullTopology, FsConfigurator
 from fslib.common import get_logger, set_fscore
 import random
@@ -85,6 +85,16 @@ class FsCore(object):
             sys.exit(-1)
         expire_time = self.now + delay
         heappush(self.__heap, (expire_time, evid, callback, fnargs))
+
+    def cancel(self, evid):
+        '''Cancel an event that matches evid'''
+        i = 0
+        removed = []
+        while i < len(self.__heap):
+            if self.__heap[i][1] == evid:
+                removed.append(self.__heap.pop(i))
+        heapify(self.__heap)
+        return len(removed)
 
     def run(self, scenario, configonly=False):
         '''Start the simulation using a particular scenario filename'''

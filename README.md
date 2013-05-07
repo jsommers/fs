@@ -11,7 +11,7 @@ research paper is on branch fs-orig.  The master branch is completely revamped
 and includes the fs-sdn code as described in a forthcoming HotSDN paper (fs-sdn).
 Better (any) documentation is coming.
 
-# Building fs
+# Running fs
 
 FS is implemented in Python and has a few external module dependencies:
 
@@ -28,6 +28,9 @@ To install all the above, see the requirements.txt file here and use pip:
 
 I'd recommend using virtualenv, then installing the packages inside
 the venv.  See http://pypi.python.org/pypi/virtualenv.
+
+fs runs fastest using pypy (http://pypy.org) but also works well under the
+standard CPython implementation.  
 
 ----------
 

@@ -263,7 +263,7 @@ class Node(object):
         a flowlet key in order to hash correctly to the right link in the case of multiple links.'''
         tlist = self.arp_table_node.get(nodename)
         if not tlist:
-            raise ArpFailure()
+            return None
         tup = tlist[hash(flowkey) % len(tlist)]
         return self.interfaces[tup[0]]
 
@@ -300,12 +300,25 @@ class ForwardingFailure(Exception):
     pass
 
 class Router(Node):
-    __slots__ = ['autoack', 'forwarding_table']
+    __slots__ = ['autoack', 'forwarding_table', 'default_link']
 
     def __init__(self, name, measurement_config, **kwargs): 
         Node.__init__(self, name, measurement_config, **kwargs)
         self.autoack=kwargs.get('autoack',False)
         self.forwarding_table = PyTricia(32)
+        self.default_link = None
+
+    def setDefaultNextHop(self, nexthop):
+        '''Set up a default next hop route.  Assumes that we just select the first link to the next
+        hop node if there is more than one.'''
+        self.logger.debug("Default: {}, {}".format(nexthop, str(self.arp_table_node)))
+        xli = self.arp_table_node.get(nexthop, None)
+        if not xli:
+            raise ForwardingFailure("Error setting default next hop: there's no static ARP entry to get interface")
+        self.logger.debug("Setting default next hop for {} to {}".format(self.name, nexthop))
+        nextip = xli[0][0]
+        linkobj = self.interfaces[nextip]
+        self.default_link = linkobj
 
     def addForwardingEntry(self, prefix, nexthop):
         '''Add new forwarding table entry to Node, given a destination prefix
@@ -400,5 +413,6 @@ class Router(Node):
     def forward(self, flowlet, destnode):
         nextnode = self.nextHop(flowlet.dstaddr)
         link = self.linkFromNexthopNode(nextnode, flowkey=flowlet.key)
+        link = link or self.default_link
         link.flowlet_arrival(flowlet, self.name, destnode)   
 

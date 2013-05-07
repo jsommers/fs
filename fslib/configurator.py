@@ -2,6 +2,7 @@
 
 __author__ = 'jsommers@colgate.edu'
 
+import sys
 from importlib import import_module
 from abc import ABCMeta, abstractmethod
 import json
@@ -459,6 +460,20 @@ class FsConfigurator(object):
             linkfwd.set_egress_ip(ipb)
             linkrev.set_ingress_ip(ipb)
             linkrev.set_egress_ip(ipa)
+
+        for rname,rdict in self.graph.nodes_iter(data=True):
+            if 'defaultroute' in rdict:
+                default = rdict['defaultroute']
+                nextnode = None
+                self.logger.debug("trying to add default route for {} - {}".format(rname, default))
+                if isinstance(default, bool):
+                    adjacencies = self.graph[rname]
+                    print "Adjacencies:",adjacencies
+                    nextnode = adjacencies.keys()[0]
+                elif isinstance(default, (str,unicode)):
+                    nextnode = default
+                self.nodes[rname].setDefaultNextHop(nextnode)
+
 
     def __configure_traffic(self):
         for n,d in self.graph.nodes_iter(data=True):

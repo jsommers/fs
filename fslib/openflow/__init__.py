@@ -144,6 +144,5 @@ def load_pox_component(name):
 
 monkey_patch_pox()
 load_pox_component("pox.openflow")
-load_pox_component("pox.openflow.discovery")
 
 from pox_bridge import *

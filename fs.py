@@ -149,7 +149,7 @@ def main():
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
-        print >> sys.stderr,"Usage: %s [options] <scenario.dot>" % (sys.argv[0])
+        print >> sys.stderr,"Usage: %s [options] <scenario.[dot,json]>" % (sys.argv[0])
         sys.exit(0)
 
     random.seed(options.seed)

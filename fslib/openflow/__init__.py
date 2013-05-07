@@ -135,6 +135,7 @@ def load_pox_component(name):
             log.error("Can't load POX module {}".format(name))
             raise RuntimeError()
         else:
+            log.debug("Loading POX component {}".format(name))
             m.launch()
     except ImportError,e:
         log.error("Error trying to import {} POX component".format(name))

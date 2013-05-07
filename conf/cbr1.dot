@@ -37,7 +37,7 @@ graph test {
 
     controllerx [
         type="OpenflowController"
-	components="shortest_paths"
+	components="pox.openflow.discovery"
     ];
 
     a [

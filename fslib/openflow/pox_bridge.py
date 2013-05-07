@@ -5,8 +5,18 @@ from fslib.openflow import load_pox_component
 
 from fslib.node import Node
 from fslib.common import fscore, get_logger
+from fslib.flowlet import Flowlet, FlowIdent
 
 '''Because 'bridge' sounds better than 'monkeypatch'.'''
+
+class OpenflowMessage(Flowlet):
+    __slots__ = ['ofmsg']
+
+    def __init__(self, ident, ofmsg):
+        Flowlet.__init__(self, ident)
+        self.ofmsg = ofmsg
+        self.bytes = len(ofmsg)
+
 
 class PoxBridgeSoftwareSwitch(SoftwareSwitchBase):
     def _output_packet_physical(self, packet, port_num):
@@ -39,7 +49,7 @@ class OpenflowSwitch(Node):
         '''Callback function for POX SoftwareSwitchBase to send an outgoing OF message
         to controller.'''
         self.logger.debug("OF switch sending to controller: {}".format(ofmessage))
-        self.controller_links[self.controller_name].flowlet_arrival()
+        self.controller_links[self.controller_name].flowlet_arrival(OpenflowMessage(None, ofmessage), self.name, self.controller_name)
 
     def set_message_handler(self, *args):
         '''Dummy callback function for POX SoftwareSwitchBase'''
@@ -58,15 +68,18 @@ class OpenflowSwitch(Node):
             self.pox_switch.rx_message(self, flowlet)
 
     def add_link(self, link, hostip, remoteip, next_node):
-        portnum = len(self.interfaces) + 1
-        self.interfaces[portnum] = (link, hostip, remoteip, next_node)
-        hwaddr = "00:00:00:00:%2x:%2x" % (self.dpid % 255, portnum)
-        self.arp_table_node[next_node].append( (hwaddr, portnum, hostip, remoteip, link) )
-        self.arp_table_ip[remoteip] = (hwaddr, portnum, hostip, next_node, link)
+        if next_node == self.controller_name:
+            self.controller_links[self.controller_name] = link
+        else:
+            portnum = len(self.interfaces) + 1
+            self.interfaces[portnum] = (link, hostip, remoteip, next_node)
+            hwaddr = "00:00:00:00:%2x:%2x" % (self.dpid % 255, portnum)
+            self.arp_table_node[next_node].append( (hwaddr, portnum, hostip, remoteip, link) )
+            self.arp_table_ip[remoteip] = (hwaddr, portnum, hostip, next_node, link)
 
     def start(self):
         Node.start(self)
-        for pnum,ifinfo in self.interfaces.iteritems():
+        for portnum,ifinfo in self.interfaces.iteritems():
             self.pox_switch.add_port(portnum)
 
 
@@ -86,7 +99,8 @@ class OpenflowController(Node):
         '''Handle switch-to-controller incoming messages'''
         # assumption: flowlet is an openflow message
         self.logger.debug("Switch-to-controller {}->{}: {}".format(prevnode, destnode, flowlet))
-        self.switch_links[prevnode][0].simrecv(flowlet) 
+        assert(isinstance(flowlet,OpenflowMessage))
+        self.switch_links[prevnode][0].simrecv(flowlet.ofmsg) 
 
     def add_link(self, link, hostip, remoteip, next_node):
         '''don't do much except create queue of switch connections so that we can
@@ -99,8 +113,8 @@ class OpenflowController(Node):
 
     def controller_to_switch(self, switchlink, mesg):
         '''Ferry an OF message from controller to switch'''
-        self.logger.debug("Controller-to-switch {}->{}: {}".format(self.name, switchlink.egress_node, mesg))
-        switchlink.flowlet_arrival(mesg, self.name, switchlink.egress_node)
+        self.logger.debug("Controller-to-switch {}->{}: {}".format(self.name, switchlink.egress_node.name, mesg))
+        switchlink.flowlet_arrival(OpenflowMessage(None, mesg), self.name, switchlink.egress_node)
 
     def start(self):
         '''create POX quasi-connections from switch to controller

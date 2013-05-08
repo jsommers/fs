@@ -11,7 +11,8 @@ graph test {
     flowinactivetmo=60
 
     a [ 
-        type="ofswitch"
+        type="OpenflowSwitch"
+        controller="controller"
         autoack="False"
         ipdests="10.1.0.0/16"
         traffic="m1"
@@ -20,7 +21,8 @@ graph test {
     ];
 
     b [ 
-        type="ofswitch"
+        type="OpenflowSwitch"
+        controller="controller"
         autoack="False"
         ipdests="10.2.0.0/16" 
         traffic="m2"
@@ -29,14 +31,15 @@ graph test {
     ];
 
     c [ 
-        type="ofswitch"
+        type="OpenflowSwitch"
+        controller="controller"
         autoack="False"
         ipdests="10.3.0.0/16 10.4.0.0/16 10.0.0.0/8" 
     ];
 
     controller [
-        type="ofcontroller"
-	forwarding="l2_pairs"
+        type="OpenflowController"
+	forwarding="pox.forwarding.l2_pairs"
     ];
 
 

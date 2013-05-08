@@ -81,6 +81,10 @@ class Flowlet(object):
         # check if tcp and FIN or RST
         return self.ipproto == IPPROTO_TCP and (self.tcpflags & 0x01 or self.tcpflags & 0x04)
 
+    @property  
+    def ident(self):
+        return self.__flowident
+        
     @property
     def key(self):
         return self.flowident.key

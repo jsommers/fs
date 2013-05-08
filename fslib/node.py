@@ -220,7 +220,7 @@ class Node(object):
        the arrival of a new flowlet at the node.'''
     __metaclass__ = ABCMeta
 
-    __slots__ = ['__name','node_measurements','interfaces','logger','arp_table_ip', 'arp_table_node']
+    __slots__ = ['__name','__started','node_measurements','interfaces','logger','arp_table_ip', 'arp_table_node']
 
     def __init__(self, name, measurement_config, **kwargs):
         # exportfn, exportinterval, exportfile):
@@ -233,6 +233,11 @@ class Node(object):
         self.logger = get_logger()
         self.arp_table_ip = {}
         self.arp_table_node = defaultdict(list)
+        self.__started = False
+
+    @property
+    def started(self):
+        return self.__started
 
     def addStaticArpEntry(self, ipaddr, macaddr, node):
         '''
@@ -272,6 +277,7 @@ class Node(object):
         return self.__name
 
     def start(self):
+        self.__started = True
         self.node_measurements.start()
 
     def stop(self):

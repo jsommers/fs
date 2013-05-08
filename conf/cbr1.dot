@@ -47,9 +47,9 @@ graph test {
     ]
 
     head -- a [weight=10, capacity=1000000000, delay=0.01 ];
-    head -- controllerx [ capacity=1000000000, delay=0.01 ]
+    head -- controllerx [ capacity=1000000000, delay=0.001 ]
     a -- tail [weight=10, capacity=1000000000, delay=0.01 ];
-    a -- controllerx [ capacity=1000000000, delay=0.01 ]
-    tail -- controllerx [ capacity=1000000000, delay=0.01 ]
+    a -- controllerx [ capacity=1000000000, delay=0.001 ]
+    tail -- controllerx [ capacity=1000000000, delay=0.001 ]
 }
     

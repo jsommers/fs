@@ -71,14 +71,15 @@ class PoxLibPlug(object):
 
 origConn = ofcore.Connection
 class FakeOpenflowConnection(ofcore.Connection):
-    def __init__(self, sock, controller_send):
+    def __init__(self, sock, controller_send, switchname="wrong"):
         self.sendfn = controller_send
-        origConn.__init__(self, -1)         
         self.idle_time = fscore().now
+        self.switchname = switchname
+        origConn.__init__(self, -1)         
 
     def send(self, ofmessage):
-        # print "FakeOpenflowConnection Sending {}".format(str(ofmessage))
-        self.sendfn(ofmessage)
+        get_logger().debug("Doing callback in OF connection from controller->switch {}".format(ofmessage)) 
+        self.sendfn(self.switchname, ofmessage)
 
     def read(self):
         print "Got read() in Fake Connection, but we expect simrecv to be called"
@@ -119,6 +120,8 @@ def monkey_patch_pox():
 
     setattr(recoco, "Timer", FakePoxTimer)
     setattr(pox.lib, "revent", fakerlib)
+    setattr(pox.lib, "ioworker", fakerlib)
+    setattr(pox.lib, "pxpcap", fakerlib)
     setattr(pox, "messenger", fakerlib)
     setattr(pox, "misc", fakerlib)
     setattr(ofcore, "Connection", FakeOpenflowConnection)

@@ -37,6 +37,9 @@ class Link(object):
         self.doqdelay = True
         self.logger = get_logger()
 
+    def __str__(self):
+        return "Link {}->{}".format(self.ingress_name, self.egress_name)
+
     @staticmethod
     def parse_capacity(capacity):
         '''Parse config file capacity, return capacity as a float in bits/sec'''

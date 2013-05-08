@@ -386,7 +386,6 @@ class FsConfigurator(object):
 
     def __addupd_router(self, rname, rdict, measurement_config):
         robj = None
-        forwarding = None
         if rname not in self.nodes:
             ctype = rdict.get('type', 'Router')
             if self.debug:

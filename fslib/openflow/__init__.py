@@ -60,6 +60,7 @@ class FakePoxTimer(object):
         self.run()
 
     def run (self):
+        get_logger().debug("OF FakeTimer setting up timer callback {} {}".format(self._timeToWake, self._callback))
         fscore().after(self._timeToWake, self.id, self.docallback, None)
         
 

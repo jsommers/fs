@@ -36,7 +36,7 @@ graph test {
 
     controller [
         type="ofcontroller"
-	    forwarding="shortest_paths"
+	    components="shortest_paths"
     ];
 
     a [

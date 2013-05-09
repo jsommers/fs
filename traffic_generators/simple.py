@@ -209,7 +209,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
         else:
             f.pkts = next(self.pkts)
 
-        fscore().topology.node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, 'host')
+        fscore().topology.node(self.srcnode).flowlet_arrival(f, 'simple', destnode, 'host')
 
         ticks -= 1
         fscore().after(xinterval, 'rawflow-flowemit-'+str(self.srcnode), self.flowemit, flowlet, destnode, xinterval, ticks)
@@ -255,7 +255,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
         # print 'xinterval',xinterval
 
         if not ticks or ticks == 1:
-            fscore().topology.node(self.srcnode).flowlet_arrival(f, 'rawgen', destnode, 'host')
+            fscore().topology.node(self.srcnode).flowlet_arrival(f, 'simple', destnode, 'host')
         else:
             fscore().after(0, "rawflow-flowemit-{}".format(self.srcnode), self.flowemit, f, destnode, xinterval, ticks)
       

@@ -2,3 +2,4 @@ tmp
 *.pyc
 *.pyo
 .DS_Store
+env.sh

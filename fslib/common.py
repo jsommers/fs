@@ -4,7 +4,7 @@ Functions that are commonly used in various fs modules and subsystems.
 '''
 import logging
 
-LOG_FORMAT = '%(created)4s %(name)-12s %(levelname)-8s %(message)s'
+LOG_FORMAT = '%(created)4.4f %(name)-12s %(levelname)-8s %(message)s'
 
 _applog = None
 def setup_logger(logfile, debug):

@@ -12,7 +12,7 @@ import os.path
 from optparse import OptionParser
 from heapq import heappush, heappop, heapify
 from fslib.configurator import NullTopology, FsConfigurator
-from fslib.common import get_logger, set_fscore
+import fslib.common as fscommon
 import random
 
 
@@ -24,13 +24,14 @@ class FsCore(object):
 
     def __init__(self, interval, endtime=1.0, debug=False, progtick=0.05):
         if FsCore.inited:
-            get_logger().warn("Trying to initialize a new simulation object.")
+            fscommon.get_logger().warn("Trying to initialize a new simulation object.")
             sys.exit(-1)
+        FsCore.inited = True
 
         self.__debug = debug
         self.__interval = interval
         self.__now = 0.0
-        self.__logger = get_logger(debug)
+        self.__logger = fscommon.get_logger()
 
         self.__heap = []
         self.endtime = endtime
@@ -38,7 +39,7 @@ class FsCore(object):
         self.intr = False
         self.progtick = progtick
         self.__topology = NullTopology()
-        set_fscore(self)
+        fscommon.set_fscore(self)
 
     def progress(self):
         '''Callback for printing simulation timeline progress'''
@@ -64,6 +65,9 @@ class FsCore(object):
     @property
     def now(self):
         '''Get the current simulation time'''
+        return self.__now
+
+    def nowfn(self):
         return self.__now
 
     @property  
@@ -131,21 +135,23 @@ def main():
     '''Parse command-line arguments and start up the simulation'''
     parser = OptionParser()
     parser.prog = "fs.py"
+    parser.add_option("-f", "--logfile", dest="logfile", 
+                      default="", help="Send log to file (default: log to stderr)")
     parser.add_option("-d", "--debug", dest="debug", 
                       default=False, action="store_true", 
                       help="Turn on debugging output")
     parser.add_option("-t", "--simtime", dest="simtime", 
                       default=300, type=int,
-                      help="Set amount of simulation time")
+                      help="Set amount of simulation time (default: 300 sec)")
     parser.add_option("-i", "--interval", dest="interval", 
                       default=1.0, type=float,
-                      help="Set the simulation tick interval (sec)")
+                      help="Set the simulation tick interval (sec) (default: 1 sec)")
     parser.add_option("-c", "--configonly", dest="configonly",
                       default=False, action="store_true",
                       help="Just do configuration then exit")
     parser.add_option("-s", "--seed", dest="seed",
                       default=None, type="int",
-                      help="Set random number generation seed.")
+                      help="Set random number generation seed (default: seed based on system time)")
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
@@ -153,6 +159,7 @@ def main():
         sys.exit(0)
 
     random.seed(options.seed)
+    fscommon.setup_logger(options.logfile, options.debug)
 
     sim = FsCore(options.interval, endtime=options.simtime, debug=options.debug)
     signal.signal(signal.SIGINT, sim.sighandler)

@@ -6,14 +6,25 @@ from flowexporter import FlowExporter
 
 class TextExporter(FlowExporter):
     '''Export flowlets to a simple text format'''
-    def __init__(self, rname):
+    def __init__(self, rname, bufsize=200):
         FlowExporter.__init__(self, rname)
         outname = self.routername + '_flow.txt'
         self.outfile = open(outname, 'wb')
+        self.buffer = []
+        self.bufsize = bufsize
+
+    def _flush_buffer(self):
+        for record in self.buffer:
+            print >>self.outfile,record
+        self.buffer = []
 
     def shutdown(self):
+        self._flush_buffer()
         self.outfile.close()
 
     def exportflow(self, ts, flet):
-        print >>self.outfile,'textexport %s %0.06f %s' % (self.routername, ts, str(flet))
-
+        record = 'textexport %s %0.06f %s' % (self.routername, ts, str(flet))
+        self.buffer.append(record)
+        if len(self.buffer) >= self.bufsize:
+            self._flush_buffer()
+        

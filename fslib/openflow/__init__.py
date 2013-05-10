@@ -67,17 +67,22 @@ class FakePoxTimer(object):
 class PoxLibPlug(object):
     def __getattr__(self, attr):
         print "Pox library plug get attribute {}".format(attr)
-        assert(False)
+        assert(False),"Unexpected POX call: monkeypatch may need update."
 
 
 origConn = ofcore.Connection
 class FakeOpenflowConnection(ofcore.Connection):
-    def __init__(self, sock, controller_send, switchname="wrong"):
+    def __init__(self, sock, controller_send, switchname="wrong", dpid=None):
         self.sendfn = controller_send
-        self.idle_time = fscore().now
+        self.idle_time = None
+        self.connect_time = None
         self.switchname = switchname
-        origConn.__init__(self, -1)         
-
+        self.sock = -1
+        origConn.__init__(self, -1) 
+        self.ofnexus = pox.core.core.OpenFlowConnectionArbiter.getNexus(self)
+        self.dpid = dpid
+        self.ofnexus.connections[dpid] = self
+                
     def send(self, ofmessage):
         get_logger().debug("Doing callback in OF connection from controller->switch {}".format(ofmessage)) 
         self.sendfn(self.switchname, ofmessage)
@@ -117,6 +122,8 @@ def monkey_patch_pox():
     the openflow connection class.  Other overrides are mainly to ensure
     that nothing unexpected happens, but are strictly not necessary at
     present (using betta branch of POX)'''
+    get_logger().debug("Monkeypatching POX for integration with fs")
+
     fakerlib = PoxLibPlug()
 
     setattr(recoco, "Timer", FakePoxTimer)
@@ -150,3 +157,10 @@ monkey_patch_pox()
 load_pox_component("pox.openflow")
 
 from pox_bridge import *
+
+def pox_init():
+    get_logger().debug("Kicking POX up.")
+    pox.core.core.goUp()
+    get_logger().debug("POX components: {}".format(pox.core.core.components))
+
+fscore().after(0.0, "POX up", pox_init)

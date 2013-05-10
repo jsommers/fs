@@ -1,11 +1,12 @@
 from socket import IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP
 
-from pox.datapaths.switch import SoftwareSwitchBase
+from pox.datapaths.switch import SoftwareSwitch
 from pox.openflow import libopenflow_01 as oflib
 import pox.lib.packet as pktlib
 from pox.lib.addresses import *
 import pox.openflow.of_01 as ofcore
 from fslib.openflow import load_pox_component
+import pox.core
 
 from fslib.node import Node
 from fslib.common import fscore, get_logger
@@ -64,11 +65,12 @@ def flowlet_to_packet(flowlet):
     return etherhdr
 
 def packet_to_flowlet(ofpkt):
-    pass
+    assert(False),"packet_to_flowlet not implemented"
 
-class PoxBridgeSoftwareSwitch(SoftwareSwitchBase):
+class PoxBridgeSoftwareSwitch(SoftwareSwitch):
     def _output_packet_physical(self, packet, port_num):
         self.forward(packet, port_num)
+        SoftwareSwitch._output_packet_physical(self, packet, port_num)
 
     def set_output_packet_callback(self, fn):
         self.forward = fn
@@ -80,7 +82,8 @@ class OpenflowSwitch(Node):
     def __init__(self, name, measurement_config, **kwargs):
         Node.__init__(self, name, measurement_config, **kwargs)
         self.dpid = abs(hash(name))
-        self.pox_switch = PoxBridgeSoftwareSwitch(self.dpid, name=name, ports=0)
+        self.pox_switch = PoxBridgeSoftwareSwitch(self.dpid, name=name, 
+            ports=0, miss_send_len=2**16, max_buffers=2**8, features=None)
         self.pox_switch.set_connection(self)
         self.pox_switch.set_output_packet_callback(self. send_packet)
         self.controller_name = kwargs['controller']
@@ -92,21 +95,21 @@ class OpenflowSwitch(Node):
 
         # explicitly add a localhost link
         self.interfaces[1] = (None, '127.0.0.1', '127.0.0.1', None)
-        self.arp_table_ip['host'] = ("00:00:00:00:00:00", 1, '127.0.0.1', None, None)
+        self.arp_table_ip['host'] = ("00:00:00:00:{:02x}:01".format(self.dpid % 255), 1, '127.0.0.1', None, None)
+        self.pox_switch.add_port(1)
 
     def send_packet(self, packet, port_num):
         '''Forward a data plane packet out a given port'''
-        packet_to_flowlet()
+        flet = packet_to_flowlet(packet)
         self.interfaces[port_num].flowlet_arrival()
 
     def send(self, ofmessage):
-        '''Callback function for POX SoftwareSwitchBase to send an outgoing OF message
+        '''Callback function for POX SoftwareSwitch to send an outgoing OF message
         to controller.'''
         if not self.started:
             self.logger.debug("OF switch queuing message for controller - sim not started yet {}".format(ofmessage))
             evid = 'deferred switch->controller send'
             fscore().after(0.0, evid, self.send, ofmessage)
-            # self.ofmsg_backlog.append( (ofmessage,) )
         else:
             self.logger.debug("OF switch sending to controller {} - {}".format(str(self.controller_links[self.controller_name]), ofmessage))
             clink = self.controller_links[self.controller_name]
@@ -120,6 +123,7 @@ class OpenflowSwitch(Node):
         '''Incoming flowlet: determine whether it's a data plane flowlet or whether it's an OF message
         coming back from the controller'''
         if isinstance(flowlet, OpenflowMessage):
+            self.logger.debug("Switch {} received openflow message from controller: {}".format(self.name, flowlet.ofmsg))
             self.pox_switch.rx_message(self, flowlet.ofmsg)
         elif isinstance(flowlet, Flowlet):
             # assume this is an incoming flowlet on the dataplane.  
@@ -133,6 +137,7 @@ class OpenflowSwitch(Node):
                 pkt = flowlet_to_packet(flowlet)
                 pkt.flowlet = flowlet
                 self.pox_switch.rx_packet(pkt, input_port)
+                self.logger.debug("Translated flowlet: {}".format(pkt))
         else:
             raise UnhandledPoxPacketFlowletTranslation("Unexpected message in OF switch: {}".format(type(flowlet)))
 
@@ -144,9 +149,10 @@ class OpenflowSwitch(Node):
             portnum = len(self.interfaces) + 1
             self.interfaces[portnum] = (link, hostip, remoteip, next_node)
             self.pox_switch.add_port(portnum)
-            hwaddr = "00:00:00:00:%2x:%2x" % (self.dpid % 255, portnum)
+            hwaddr = "00:00:00:00:%02x:%02x" % (self.dpid % 255, portnum)
             self.arp_table_node[next_node].append( (hwaddr, portnum, hostip, remoteip, link) )
             self.arp_table_ip[remoteip] = (hwaddr, portnum, hostip, next_node, link)
+            self.logger.debug("New port in OF switch {}: port:{} hwaddr:{} hostip:{} next:{}".format(self.name, portnum, hwaddr, hostip, next_node))
 
 
 class OpenflowController(Node):
@@ -155,32 +161,37 @@ class OpenflowController(Node):
     def __init__(self, name, measurement_config, **kwargs):
         Node.__init__(self, name, measurement_config, **kwargs)
         self.components = kwargs.get('components','').split()
-        for component in self.components:
-            load_pox_component(component)
         self.switch_links = {}
 
     def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
         '''Handle switch-to-controller incoming messages'''
         # assumption: flowlet is an OpenflowMessage
-        self.logger.debug("Switch-to-controller {}->{}: {}".format(prevnode, destnode, flowlet))
+        assert(isinstance(flowlet,OpenflowMessage))
+        self.logger.debug("OF controller receive from switch {}->{}: {}".format(prevnode, destnode, flowlet.ofmsg))
         self.switch_links[prevnode][0].simrecv(flowlet.ofmsg) 
 
     def add_link(self, link, hostip, remoteip, next_node):
         '''don't do much except create queue of switch connections so that we can
         eventually build ofcore.Connection objects for each one
         once start() gets called.'''
-        xconn = ofcore.Connection(-1, self.controller_to_switch, next_node)
+        xconn = ofcore.Connection(-1, self.controller_to_switch, next_node, link.egress_node.dpid)
         self.switch_links[next_node] = (xconn, link)
 
     def controller_to_switch(self, switchname, mesg):
         '''Ferry an OF message from controller to switch'''
         if not self.started:
-            self.logger.debug("Deferring OF message to switch until sim starts {}".format(mesg))
-            # self.ofmsg_backlog.append( (switchname, mesg) )
+            self.logger.debug("Deferring OF message from controller until sim starts {}".format(mesg))
             evid = 'deferred controller->switch send'
             fscore().after(0, evid, self.controller_to_switch, switchname, mesg)
         else:
-            self.logger.debug("Controller-to-switch {}->{}: {}".format(self.name, switchname, mesg))
+            self.logger.debug("OF controller-to-switch {}->{}: {}".format(self.name, switchname, mesg))
             link = self.switch_links[switchname][1]
             link.flowlet_arrival(OpenflowMessage(FlowIdent(), mesg), self.name, switchname)
        
+    def start(self):
+        '''Load POX controller components'''
+        Node.start(self)
+        for component in self.components:
+            self.logger.debug("Starting OF Controller Component {}".format(component))
+            load_pox_component(component)
+

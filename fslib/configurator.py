@@ -258,7 +258,7 @@ class Topology(NullTopology):
 class FsConfigurator(object):
     def __init__(self, debug):
         self.debug = debug
-        self.logger = get_logger(debug)
+        self.logger = get_logger()
 
     def __strip_strings(self):
         '''Clean up all the strings in the imported config.'''

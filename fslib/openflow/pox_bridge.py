@@ -132,8 +132,7 @@ class OpenflowSwitch(Node):
             if isinstance(flowlet.ofmsg, oflib.ofp_base):
                 ofmsg = flowlet.ofmsg
             elif isinstance(flowlet.ofmsg, str):
-                ofmsg = oflib.ofp_packet_out()
-                ofmsg.unpack(flowlet.ofmsg)
+                ofmsg = oflib.ofp_base.unpack_new(flowlet.ofmsg)
             else:
                 raise UnhandledPoxPacketFlowletTranslation("Not an openflow message from controller: {}".format(flowlet.ofmsg))
 

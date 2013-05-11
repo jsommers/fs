@@ -127,7 +127,18 @@ class OpenflowSwitch(Node):
         '''Incoming flowlet: determine whether it's a data plane flowlet or whether it's an OF message
         coming back from the controller'''
         if isinstance(flowlet, OpenflowMessage):
-            self.pox_switch.rx_message(self, flowlet.ofmsg)
+            self.logger.debug("Received from controller: {}".format(flowlet.ofmsg))
+            ofmsg = None
+            if isinstance(flowlet.ofmsg, oflib.ofp_base):
+                ofmsg = flowlet.ofmsg
+            elif isinstance(flowlet.ofmsg, str):
+                ofmsg = oflib.ofp_packet_out()
+                ofmsg.unpack(flowlet.ofmsg)
+            else:
+                raise UnhandledPoxPacketFlowletTranslation("Not an openflow message from controller: {}".format(flowlet.ofmsg))
+
+            self.pox_switch.rx_message(self, ofmsg)
+
         elif isinstance(flowlet, Flowlet):
             self.measure_flow(flowlet, prevnode, input_ip)
             # assume this is an incoming flowlet on the dataplane.  

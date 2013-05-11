@@ -126,7 +126,7 @@ def monkey_patch_pox():
 
     fakerlib = PoxLibPlug()
 
-    setattr(recoco, "Timer", FakePoxTimer)
+    # setattr(recoco, "Timer", FakePoxTimer)
     setattr(pox.lib, "revent", fakerlib)
     setattr(pox.lib, "ioworker", fakerlib)
     setattr(pox.lib, "pxpcap", fakerlib)

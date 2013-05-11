@@ -30,7 +30,7 @@ graph test {
 
     controller [
         type="OpenflowController"
-	components="pox.forwarding.hub"
+	components="pox.forwarding.hub pox.openflow.discovery"
     ];
 
 

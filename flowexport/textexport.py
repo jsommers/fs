@@ -14,8 +14,7 @@ class TextExporter(FlowExporter):
         self.bufsize = bufsize
 
     def _flush_buffer(self):
-        for record in self.buffer:
-            print >>self.outfile,record
+        self.outfile.write(''.join(self.buffer))
         self.buffer = []
 
     def shutdown(self):
@@ -23,7 +22,7 @@ class TextExporter(FlowExporter):
         self.outfile.close()
 
     def exportflow(self, ts, flet):
-        record = 'textexport %s %0.06f %s' % (self.routername, ts, str(flet))
+        record = 'textexport %s %0.06f %s\n' % (self.routername, ts, str(flet))
         self.buffer.append(record)
         if len(self.buffer) >= self.bufsize:
             self._flush_buffer()

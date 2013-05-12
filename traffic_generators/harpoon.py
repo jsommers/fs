@@ -205,11 +205,7 @@ class HarpoonTrafficGenerator(TrafficGenerator):
             sport = next(self.srcports)
             dport = next(self.dstports)
             fsize = int(next(self.flowsizerv))
-            # Creating src and dst mac addresses
-            srcmac = default_ip_to_macaddr(srcip)
-            dstmac = default_ip_to_macaddr(dstip)
-            flet = Flowlet(FlowIdent(srcip, dstip, ipproto, sport, dport, srcmac, dstmac), 
-                           bytes=fsize)
+            flet = Flowlet(FlowIdent(srcip, dstip, ipproto, sport, dport), bytes=fsize)
             
             flet.iptos = next(self.iptosrv)
             if flet.key not in self.activeflows:

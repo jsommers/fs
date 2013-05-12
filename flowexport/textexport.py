@@ -6,7 +6,7 @@ from flowexporter import FlowExporter
 
 class TextExporter(FlowExporter):
     '''Export flowlets to a simple text format'''
-    def __init__(self, rname, bufsize=200):
+    def __init__(self, rname, bufsize=500):
         FlowExporter.__init__(self, rname)
         outname = self.routername + '_flow.txt'
         self.outfile = open(outname, 'wb')

@@ -1,4 +1,5 @@
 from socket import IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP
+import logging
 
 from pox.datapaths.switch import SoftwareSwitch
 from pox.openflow import libopenflow_01 as oflib
@@ -20,6 +21,12 @@ class UnhandledPoxPacketFlowletTranslation(Exception):
 
 '''Because 'bridge' sounds better than 'monkeypatch'.'''
 
+class PoxFlowlet(Flowlet):
+    __slots__ = ['origpkt']
+    def __init__(self, ident):
+        Flowlet.__init__(self, ident)
+        self.origpkt = None
+
 class OpenflowMessage(Flowlet):
     __slots__ = ['ofmsg']
 
@@ -29,11 +36,15 @@ class OpenflowMessage(Flowlet):
         self.bytes = len(ofmsg)
 
 def flowlet_to_packet(flowlet):
+    '''Translate an fs flowlet to a POX packet'''
+    if hasattr(flowlet, "origpkt"):
+        return getattr(flowlet, "origpkt")
+
     ident = flowlet.ident.key
 
     etherhdr = pktlib.ethernet()
-    etherhdr.src = EthAddr(ident.srcmac)
-    etherhdr.dst = EthAddr(ident.dstmac)
+    etherhdr.src = EthAddr(flowlet.srcmac)
+    etherhdr.dst = EthAddr(flowlet.dstmac)
     etherhdr.type = pktlib.ethernet.IP_TYPE
 
     ipv4 = pktlib.ipv4() 
@@ -66,10 +77,45 @@ def flowlet_to_packet(flowlet):
     return etherhdr
 
 def packet_to_flowlet(pkt):
+    '''Translate a POX packet to an fs flowlet'''
     try:
         return getattr(pkt, "origflet")
     except AttributeError,e:
-        raise UnhandledPoxPacketFlowletTranslation("No cached flowlet found in pkt out.")
+        log = get_logger()
+        ip = pkt.find('ipv4')
+        if ip is None:
+            flet = PoxFlowlet(FlowIdent())
+            log.warn("Received non-IP packet {} from POX: can't translate to fs".format(str(pkt.payload)))
+        else:
+            dport = sport = tcpflags = 0
+            if ip.protocol == IPPROTO_TCP:
+                tcp = ip.payload
+                sport = tcp.srcport
+                dport = tcp.dstport
+                tcpflags = tcp.flags
+                log.debug("Translating POX TCP packet to fs {}".format(tcp))
+            elif ip.protocol == IPPROTO_UDP:
+                udp = ip.payload
+                sport = udp.srcport
+                dport = udp.dstport
+                log.debug("Translating POX UDP packet to fs {}".format(udp))
+            elif ip.protocol == IPPROTO_ICMP:
+                icmp = ip.payload
+                dport = (icmp.type << 8) | icmp.code
+                log.debug("Translating POX ICMP packet to fs {}".format(icmp))
+            else:
+                log.warn("Received unhandled IPv4 packet {} from POX: can't translate to fs".format(str(ip.payload)))
+
+            flet = PoxFlowlet(FlowIdent(srcip=ip.srcip, dstip=ip.dstip, ipproto=ip.protocol, sport=sport, dport=dport))
+            flet.tcpflags = tcpflags
+            flet.iptos = ip.tos
+
+        flet.srcmac = pkt.src
+        flet.dstmac = pkt.dst
+        flet.pkts = 1
+        flet.bytes = len(pkt)
+        flet.origpkt = pkt
+        return flet
 
 class PoxBridgeSoftwareSwitch(SoftwareSwitch):
     def _output_packet_physical(self, packet, port_num):
@@ -100,10 +146,12 @@ class OpenflowSwitch(Node):
         self.interfaces[1] = (None, '127.0.0.1', '127.0.0.1', None)
         self.arp_table_ip['host'] = ("00:00:00:00:{:02x}:01".format(self.dpid % 255), 1, '127.0.0.1', None, None)
         self.pox_switch.add_port(1)
+        self.pox_switch.ports[1].enable_config(oflib.OFPPC_NO_FWD)
 
     def send_packet(self, packet, port_num):
         '''Forward a data plane packet out a given port'''
         flet = packet_to_flowlet(packet)
+        self.logger.debug("Switch sending translated packet {}->{} on port {}".format(packet, flet, port_num))
         nhinfo = self.interfaces[port_num]
         nhinfo[0].flowlet_arrival(flet, self.name, nhinfo[3])
 
@@ -132,7 +180,11 @@ class OpenflowSwitch(Node):
             if isinstance(flowlet.ofmsg, oflib.ofp_base):
                 ofmsg = flowlet.ofmsg
             elif isinstance(flowlet.ofmsg, str):
-                ofmsg = oflib.ofp_base.unpack_new(flowlet.ofmsg)
+                ofhdr = oflib.ofp_header()
+                ofhdr.unpack(flowlet.ofmsg)
+                ofmsg = oflib._message_type_to_class[ofhdr.header_type]()
+                ofmsg.unpack(flowlet.ofmsg)
+                self.pox_switch.rx_message(self, ofmsg)
             else:
                 raise UnhandledPoxPacketFlowletTranslation("Not an openflow message from controller: {}".format(flowlet.ofmsg))
 
@@ -148,6 +200,7 @@ class OpenflowSwitch(Node):
                 # FIXME: autoack
                 pass
             else:                
+                self.logger.debug("Checking for {} in arp table {}".format(input_ip, self.arp_table_ip))
                 input_port = self.arp_table_ip[input_ip][1]
                 pkt = flowlet_to_packet(flowlet)
                 pkt.flowlet = flowlet
@@ -165,7 +218,7 @@ class OpenflowSwitch(Node):
             self.pox_switch.add_port(portnum)
             hwaddr = "00:00:00:00:%02x:%02x" % (self.dpid % 255, portnum)
             self.arp_table_node[next_node].append( (hwaddr, portnum, hostip, remoteip, link) )
-            self.arp_table_ip[remoteip] = (hwaddr, portnum, hostip, next_node, link)
+            self.arp_table_ip[hostip] = (hwaddr, portnum, hostip, next_node, link)
             self.logger.debug("New port in OF switch {}: port:{} hwaddr:{} hostip:{} next:{}".format(self.name, portnum, hwaddr, hostip, next_node))
 
 

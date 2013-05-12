@@ -97,6 +97,8 @@ class FsCore(object):
         while i < len(self.__heap):
             if self.__heap[i][1] == evid:
                 removed.append(self.__heap.pop(i))
+            else:
+                i += 1
         heapify(self.__heap)
         return len(removed)
 

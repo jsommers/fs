@@ -223,7 +223,7 @@ class Node(object):
         else:
             self.node_measurements = NullMeasurement()
         self.interfaces = {}
-        self.logger = get_logger()
+        self.logger = logging.getLogger(name)
         self.arp_table_ip = {}
         self.arp_table_node = defaultdict(list)
         self.__started = False

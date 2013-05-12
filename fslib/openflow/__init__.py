@@ -35,7 +35,6 @@ class FakePoxTimer(object):
 
         self._self_stoppable = selfStoppable
         self._timeToWake = timeToWake
-        self._cancelled = False
 
         self.id = "poxtimer{}".format(FakePoxTimer.timerid)
         FakePoxTimer.timerid += 1
@@ -44,24 +43,18 @@ class FakePoxTimer(object):
         self._callback = callback
         self._args = args
         self._kw = kw
-
-        if started: self.start()
+        get_logger().debug("Setting fake pox timer callback {} {}".format(self._timeToWake, self._callback))
+        fscore().after(self._timeToWake, self.id, self.docallback, None)
 
     def cancel(self):
+        get_logger().debug("Attempting to cancel fake POX timer {}".format(self.id))
         fscore().cancel(self.id)
-        self._cancelled = True
 
-    def docallback(self):
-        if self._recurring and not self._cancelled:
-            fscore().after(self._timeToWake, self.id, self.docallback, None)
+    def docallback(self, *args):
+        get_logger().debug("In fake pox timer callback {} {}".format(self._timeToWake, self._callback))
         rv = self._callback(*self._args, **self._kw)
-        
-    def start(self, scheduler=None):
-        self.run()
-
-    def run (self):
-        get_logger().debug("OF FakeTimer setting up timer callback {} {}".format(self._timeToWake, self._callback))
-        fscore().after(self._timeToWake, self.id, self.docallback, None)
+        if rv and self._recurring:
+            fscore().after(self._timeToWake, self.id, self.docallback, None)
         
 
 class PoxLibPlug(object):
@@ -126,7 +119,7 @@ def monkey_patch_pox():
 
     fakerlib = PoxLibPlug()
 
-    # setattr(recoco, "Timer", FakePoxTimer)
+    setattr(recoco, "Timer", FakePoxTimer)
     setattr(pox.lib, "revent", fakerlib)
     setattr(pox.lib, "ioworker", fakerlib)
     setattr(pox.lib, "pxpcap", fakerlib)

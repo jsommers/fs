@@ -7,7 +7,7 @@ import ipaddr
 from socket import IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP
 import time
 from collections import namedtuple
-from fslib.util import removeuniform
+from fslib.util import removeuniform, default_ip_to_macaddr
 
 
 class IncompatibleFlowlets(Exception):
@@ -20,18 +20,18 @@ class InvalidFlowletVolume(Exception):
     pass
 
 class FlowIdent(object):
-    '''the class formerly known as 'FiveTuple', now a bit more general.'''
+    '''the class formerly known as FiveTuple'''
     __slots__ = ['__key']
 
-    FLOW_IDENTIFIERS = ('srcip','dstip','ipproto','sport','dport','srcmac','dstmac','vlan')
+    FLOW_IDENTIFIERS = ('srcip','dstip','ipproto','sport','dport')
     FlowKey = namedtuple('FlowKey',FLOW_IDENTIFIERS)
 
-    def __init__(self, srcip=0, dstip=0, ipproto=0, sport=0, dport=0, srcmac=0, dstmac=0, vlan=0):
+    def __init__(self, srcip='0.0.0.0', dstip='0.0.0.0', ipproto=0, sport=0, dport=0):
         # store the flow identifier as a (named) tuple for efficiency
-        self.__key = FlowIdent.FlowKey(srcip, dstip, ipproto, sport, dport, srcmac, dstmac, vlan)
+        self.__key = FlowIdent.FlowKey(srcip, dstip, ipproto, sport, dport)
 
     def mkreverse(self):
-        rv = FlowIdent(self.key.dstip, self.key.srcip, self.key.ipproto, self.key.dport, self.key.sport, self.key.dstmac, self.key.srcmac, self.key.vlan)
+        rv = FlowIdent(self.key.dstip, self.key.srcip, self.key.ipproto, self.key.dport, self.key.sport)
         return rv
 
     def __str__(self):
@@ -42,11 +42,16 @@ class FlowIdent(object):
         return self.__key
 
 class Flowlet(object):
-    __slots__ = ['__mss','__iptos','__pkts','__bytes','__flowident','__tcpflags','__ackflow','__flowstart','__flowend','ingress_intf']
-    def __init__(self, ident, pkts=0, bytes=0, tcpflags=0):
+    __slots__ = ['__srcmac','__dstmac','__mss','__iptos','__pkts',
+                 '__bytes','__flowident','__tcpflags','__ackflow',
+                 '__flowstart','__flowend','ingress_intf']
+    def __init__(self, ident, srcmac=None, dstmac=None, pkts=0, 
+                 bytes=0, tcpflags=0):
         self.__flowident = ident
         self.__flowstart = -1.0
         self.__flowend = -1.0
+        self.__srcmac = srcmac if srcmac else default_ip_to_macaddr(self.flowident.key.srcip)
+        self.__dstmac = dstmac if dstmac else default_ip_to_macaddr(self.flowident.key.dstip)
         self.pkts = pkts
         self.bytes = bytes
         self.ingress_intf = None
@@ -94,6 +99,22 @@ class Flowlet(object):
         return self.bytes
 
     @property
+    def srcmac(self):
+        return self.__srcmac
+
+    @srcmac.setter
+    def srcmac(self, macaddr):
+        self.__srcmac = macaddr
+
+    @property
+    def dstmac(self):
+        return self.__dstmac
+
+    @dstmac.setter
+    def dstmac(self, macaddr):
+        self.__dstmac = macaddr
+
+    @property
     def srcaddr(self):
         return self.flowident.key.srcip
 
@@ -123,18 +144,6 @@ class Flowlet(object):
     @property
     def dstport(self):
         return self.flowident.key.dport
-
-    @property
-    def srcmac(self):
-        return self.flowident.key.srcmac
-
-    @property
-    def dstmac(self):
-        return self.flowident.key.dstmac
-
-    @property
-    def vlan(self):
-        return self.flowident.key.vlan
 
     @property
     def pkts(self):

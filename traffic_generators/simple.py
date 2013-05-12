@@ -159,11 +159,7 @@ class SimpleTrafficGenerator(TrafficGenerator):
             if self.dport:
                 dport = next(self.dport)
                 
-        # Creating src and dst mac addresses
-        srcmac = default_ip_to_macaddr(srcip)
-        dstmac = default_ip_to_macaddr(dstip)
-
-        flet = Flowlet(FlowIdent(srcip, dstip, ipproto, sport, dport, srcmac, dstmac))
+        flet = Flowlet(FlowIdent(srcip, dstip, ipproto, sport, dport))
         flet.iptos = next(self.iptos)
         flet.flowstart = flet.flowend = fscore().now
 

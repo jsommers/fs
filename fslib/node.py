@@ -8,7 +8,7 @@ import logging
 from random import random
 import copy
 from fslib.flowlet import *
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, namedtuple
 import copy
 import networkx
 from pytricia import PyTricia
@@ -208,12 +208,14 @@ class NodeMeasurement(NullMeasurement):
 class ArpFailure(Exception):
     pass
 
+PortInfo = namedtuple('PortInfo', ('link','localip','remoteip','localmac','remotemac'))
+
 class Node(object):
     '''Base Node class in fs.  All subclasses will want to at least override flowlet_arrival to handle
        the arrival of a new flowlet at the node.'''
     __metaclass__ = ABCMeta
 
-    __slots__ = ['__name','__started','node_measurements','interfaces','logger','arp_table_ip', 'arp_table_node']
+    __slots__ = ['__name','__started','node_measurements','ports','logger','node_to_port_map']
 
     def __init__(self, name, measurement_config, **kwargs):
         # exportfn, exportinterval, exportfile):
@@ -222,48 +224,23 @@ class Node(object):
             self.node_measurements = NodeMeasurement(measurement_config, name)
         else:
             self.node_measurements = NullMeasurement()
-        self.interfaces = {}
+        self.ports = {}
+        self.node_to_port_map = defaultdict(list)
         self.logger = logging.getLogger(name)
-        self.arp_table_ip = {}
-        self.arp_table_node = defaultdict(list)
         self.__started = False
 
     @property
     def started(self):
         return self.__started
 
-    def addStaticArpEntry(self, ipaddr, macaddr, node):
-        '''
-        Key in ARP table: destination IP address (not a prefix, an actual address).
-
-        Value in table: tuple containing MAC address corresponding to IP address, and node name.
-        The node name is the node that "owns" the IP address/MAC address pair (i.e. remote IP/MAC.
-        '''
-        self.arp_table_ip[ipaddr] = (macaddr, node)
-        self.arp_table_node[node].append( (ipaddr, macaddr) )
-
-    def removeStaticArpEntry(self, ipaddr):
-        '''
-        Remove entry in ARP table for a given IP address.
-        '''
-        if ipaddr in self.arp_table_ip:
-            mac,node = self.arp_table_ip.pop(ipaddr)
-            xli = self.arp_table_node[node]
-            xli.remove( (ipaddr,mac) )
-
-    def linkFromNexthopIpAddress(self, ipaddr):
-        '''Given a next-hop IP address, return the link object that connects current node
-        to that remote IP address, or an exception if nothing exists.'''
-        return self.interfaces.get(ipaddr,None)
-
     def linkFromNexthopNode(self, nodename, flowkey=None):
         '''Given a next-hop node name, return a link object that gets us to that node.  Optionally provide
         a flowlet key in order to hash correctly to the right link in the case of multiple links.'''
-        tlist = self.arp_table_node.get(nodename)
+        tlist = self.node_to_port_map.get(nodename)
         if not tlist:
             return None
-        tup = tlist[hash(flowkey) % len(tlist)]
-        return self.interfaces[tup[0]]
+        localip = tlist[hash(flowkey) % len(tlist)]
+        return self.ports[localip].link
 
     @property
     def name(self):
@@ -286,13 +263,14 @@ class Node(object):
     def unmeasure_flow(self, flowlet, prevnode):
         self.node_measurements.remove(flowlet, prevnode)
 
-    def add_link(self, link, hostip, remoteip, next_node):
+    def add_link(self, link, localip, remoteip, next_node):
         '''Add a new interface and link to this node.  link is the link object connecting
         this node to next_node.  hostip is the ip address assigned to the local interface for this
         link, and remoteip is the ip address assigned to the remote interface of the link.'''
-        self.interfaces[remoteip] = link
+        localmac = default_ip_to_macaddr(localip)
         remotemac = default_ip_to_macaddr(remoteip)
-        self.addStaticArpEntry(remoteip, remotemac, next_node)
+        self.ports[localip] = PortInfo(link, localip, remoteip, localmac, remotemac)
+        self.node_to_port_map[next_node].append(localip)
 
 
 class ForwardingFailure(Exception):
@@ -310,14 +288,11 @@ class Router(Node):
     def setDefaultNextHop(self, nexthop):
         '''Set up a default next hop route.  Assumes that we just select the first link to the next
         hop node if there is more than one.'''
-        self.logger.debug("Default: {}, {}".format(nexthop, str(self.arp_table_node)))
-        xli = self.arp_table_node.get(nexthop, None)
-        if not xli:
+        self.logger.debug("Default: {}, {}".format(nexthop, str(self.node_to_port_map)))
+        self.default_link = self.linkFromNexthopNode(nexthop)
+        if not self.default_link:
             raise ForwardingFailure("Error setting default next hop: there's no static ARP entry to get interface")
         self.logger.debug("Setting default next hop for {} to {}".format(self.name, nexthop))
-        nextip = xli[0][0]
-        linkobj = self.interfaces[nextip]
-        self.default_link = linkobj
 
     def addForwardingEntry(self, prefix, nexthop):
         '''Add new forwarding table entry to Node, given a destination prefix

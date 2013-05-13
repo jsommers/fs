@@ -144,7 +144,7 @@ class OpenflowSwitch(Node):
             self.ipdests[prefix] = True
 
         # explicitly add a localhost link/interface
-        localmac = default_ip_to_macaddr('127.0.0.1')
+        localmac = Flowlet.LOCALMAC
         self.ports[1] = PortInfo(link=None, localip='127.0.0.1', remoteip=None, localmac=localmac, remotemac=None)
         self.node_to_port_map['host'].append(1)
         self.pox_switch.add_port(1)
@@ -153,12 +153,12 @@ class OpenflowSwitch(Node):
         self.interface_to_port_map['host'] = 1
         self.interface_to_port_map['127.0.0.1'] = 1
 
-
     def send_packet(self, packet, port_num):
         '''Forward a data plane packet out a given port'''
         flet = packet_to_flowlet(packet)
         self.logger.debug("Switch sending translated packet {}->{} on port {}".format(packet, flet, port_num))
         pinfo = self.ports[port_num]
+        flet.srcmac,flet.dstmac = pinfo.localmac,pinfo.remotemac
         pinfo.link.flowlet_arrival(flet, self.name, pinfo.remoteip)
 
     def send(self, ofmessage):
@@ -177,7 +177,7 @@ class OpenflowSwitch(Node):
         '''Dummy callback function for POX SoftwareSwitchBase'''
         pass
 
-    def flowlet_arrival(self, flowlet, prevnode, destnode, input_intf):
+    def flowlet_arrival(self, flowlet, prevnode, destnode, input_intf="127.0.0.1"):
         '''Incoming flowlet: determine whether it's a data plane flowlet or whether it's an OF message
         coming back from the controller'''
         if isinstance(flowlet, OpenflowMessage):
@@ -197,6 +197,12 @@ class OpenflowSwitch(Node):
             self.pox_switch.rx_message(self, ofmsg)
 
         elif isinstance(flowlet, Flowlet):
+            input_port = self.interface_to_port_map[input_intf]
+            portinfo = self.ports[input_port]
+
+            if flowlet.dstmac != portinfo.localmac:
+                self.logger.warn("Arriving flowlet dstmac does not match input port {} {}".format(flowlet.dstmac, portinfo))
+
             self.measure_flow(flowlet, prevnode, input_intf)
             # assume this is an incoming flowlet on the dataplane.  
             # reformat it and inject it into the POX switch
@@ -205,7 +211,6 @@ class OpenflowSwitch(Node):
                 # FIXME: autoack
                 pass
             else:                
-                input_port = self.interface_to_port_map[input_intf]
                 pkt = flowlet_to_packet(flowlet)
                 pkt.flowlet = flowlet
                 self.pox_switch.rx_packet(pkt, input_port)
@@ -235,7 +240,7 @@ class OpenflowController(Node):
         self.components = kwargs.get('components','').split()
         self.switch_links = {}
 
-    def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
+    def flowlet_arrival(self, flowlet, prevnode, destnode, input_port="127.0.0.1"):
         '''Handle switch-to-controller incoming messages'''
         # assumption: flowlet is an OpenflowMessage
         assert(isinstance(flowlet,OpenflowMessage))

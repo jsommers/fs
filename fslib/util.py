@@ -152,7 +152,7 @@ def default_ip_to_macaddr(ipaddr):
     mac = []
     for i in xrange(4): 
         mac.append(((ip >> (8*i)) & 0xff))
-    mac.extend([0,0])
+    mac.extend([0x02,0x00])
     mac = [ "{:02x}".format(b) for b in reversed(mac) ]
     return ':'.join(mac)
 

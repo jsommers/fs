@@ -42,16 +42,18 @@ class FlowIdent(object):
         return self.__key
 
 class Flowlet(object):
+    LOCALMAC = "02:00:00:00:00:00"
     __slots__ = ['__srcmac','__dstmac','__mss','__iptos','__pkts',
                  '__bytes','__flowident','__tcpflags','__ackflow',
                  '__flowstart','__flowend','ingress_intf']
-    def __init__(self, ident, srcmac=None, dstmac=None, pkts=0, 
-                 bytes=0, tcpflags=0):
+    def __init__(self, ident, 
+                 srcmac=LOCALMAC, dstmac=LOCALMAC,
+                 pkts=0, bytes=0, tcpflags=0):
         self.__flowident = ident
         self.__flowstart = -1.0
         self.__flowend = -1.0
-        self.__srcmac = srcmac if srcmac else default_ip_to_macaddr(self.flowident.key.srcip)
-        self.__dstmac = dstmac if dstmac else default_ip_to_macaddr(self.flowident.key.dstip)
+        self.__srcmac = srcmac 
+        self.__dstmac = dstmac 
         self.pkts = pkts
         self.bytes = bytes
         self.ingress_intf = None
@@ -59,6 +61,10 @@ class Flowlet(object):
         self.mss = 1500
         self.tcpflags = 0x0
         self.ackflow = False
+
+    @property 
+    def broadcast(self):
+        return 
 
     @property
     def flowident(self):

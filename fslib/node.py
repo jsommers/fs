@@ -225,6 +225,8 @@ class Node(object):
         else:
             self.node_measurements = NullMeasurement()
         self.ports = {}
+        localmac = Flowlet.LOCALMAC
+        self.ports['127.0.0.1'] = PortInfo(None, '127.0.0.1', '127.0.0.1', localmac, localmac)
         self.node_to_port_map = defaultdict(list)
         self.logger = logging.getLogger(name)
         self.__started = False
@@ -233,14 +235,14 @@ class Node(object):
     def started(self):
         return self.__started
 
-    def linkFromNexthopNode(self, nodename, flowkey=None):
+    def portFromNexthopNode(self, nodename, flowkey=None):
         '''Given a next-hop node name, return a link object that gets us to that node.  Optionally provide
         a flowlet key in order to hash correctly to the right link in the case of multiple links.'''
         tlist = self.node_to_port_map.get(nodename)
         if not tlist:
             return None
         localip = tlist[hash(flowkey) % len(tlist)]
-        return self.ports[localip].link
+        return self.ports[localip]
 
     @property
     def name(self):
@@ -254,7 +256,7 @@ class Node(object):
         self.node_measurements.stop()
 
     @abstractmethod
-    def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
+    def flowlet_arrival(self, flowlet, prevnode, destnode, input_ident=None):
         pass
 
     def measure_flow(self, flowlet, prevnode, inport):
@@ -289,7 +291,7 @@ class Router(Node):
         '''Set up a default next hop route.  Assumes that we just select the first link to the next
         hop node if there is more than one.'''
         self.logger.debug("Default: {}, {}".format(nexthop, str(self.node_to_port_map)))
-        self.default_link = self.linkFromNexthopNode(nexthop)
+        self.default_link = self.portFromNexthopNode(nexthop).link
         if not self.default_link:
             raise ForwardingFailure("Error setting default next hop: there's no static ARP entry to get interface")
         self.logger.debug("Setting default next hop for {} to {}".format(self.name, nexthop))
@@ -322,7 +324,7 @@ class Router(Node):
             return xlist[hash(destip) % len(xlist)]
         raise ForwardingFailure()
 
-    def flowlet_arrival(self, flowlet, prevnode, destnode, input_port):
+    def flowlet_arrival(self, flowlet, prevnode, destnode, input_ip="127.0.0.1"):
         if isinstance(flowlet, SubtractiveFlowlet):
             killlist = []
             ok = []
@@ -339,54 +341,57 @@ class Router(Node):
 
             return
 
+        # a "normal" Flowlet object
+        input_port = self.ports[input_ip]
+        if flowlet.dstmac != input_port.localmac:
+            self.logger.warn("Received flowlet with MAC address that doesn't match input port: {} - {}".format(flowlet.dstmac, input_port))
+
+        self.measure_flow(flowlet, prevnode, str(input_port.localip))
+
+        if flowlet.endofflow:
+            self.unmeasure_flow(flowlet, prevnode)
+
+        if destnode == self.name:
+            if self.autoack and flowlet.ipproto == IPPROTO_TCP and not flowlet.ackflow:
+                revflow = Flowlet(flowlet.flowident.mkreverse())
+                
+                revflow.ackflow = True
+                revflow.flowstart = revflow.flowend = fscore().now
+
+                if flowlet.tcpflags & 0x04: # RST
+                    return
+
+                if flowlet.tcpflags & 0x02: # SYN
+                    revflow.tcpflags = revflow.tcpflags | 0x10
+                    # print 'setting syn/ack flags',revflow.tcpflagsstr
+
+                if flowlet.tcpflags & 0x01: # FIN
+                    revflow.tcpflags = revflow.tcpflags | 0x10 # ack
+                    revflow.tcpflags = revflow.tcpflags | 0x01 # fin
+
+                revflow.pkts = flowlet.pkts / 2 # brain-dead ack-every-other
+                revflow.bytes = revflow.pkts * 40
+
+                self.measure_flow(revflow, self.name, input_port)
+
+                # weird, but if reverse flow is short enough, it might only
+                # stay in the flow cache for a very short period of time
+                if revflow.endofflow:
+                    self.unmeasure_flow(revflow, prevnode)
+
+                destnode = fscore().topology.destnode(self.name, revflow.dstaddr)
+
+                # guard against case that we can't do the autoack due to
+                # no "real" source (i.e., source was spoofed or source addr
+                # has no route)
+                if destnode and destnode != self.name:
+                    self.forward(revflow, destnode)
         else:
-            # a "normal" Flowlet object
-            self.measure_flow(flowlet, prevnode, input_port)
-
-            if flowlet.endofflow:
-                self.unmeasure_flow(flowlet, prevnode)
-
-            if destnode == self.name:
-                if self.autoack and flowlet.ipproto == IPPROTO_TCP and not flowlet.ackflow:
-                    revflow = Flowlet(flowlet.flowident.mkreverse())
-                    
-                    revflow.ackflow = True
-                    revflow.flowstart = revflow.flowend = fscore().now
-
-                    if flowlet.tcpflags & 0x04: # RST
-                        return
-
-                    if flowlet.tcpflags & 0x02: # SYN
-                        revflow.tcpflags = revflow.tcpflags | 0x10
-                        # print 'setting syn/ack flags',revflow.tcpflagsstr
-
-                    if flowlet.tcpflags & 0x01: # FIN
-                        revflow.tcpflags = revflow.tcpflags | 0x10 # ack
-                        revflow.tcpflags = revflow.tcpflags | 0x01 # fin
-
-                    revflow.pkts = flowlet.pkts / 2 # brain-dead ack-every-other
-                    revflow.bytes = revflow.pkts * 40
-
-                    self.measure_flow(revflow, self.name, input_port)
-
-                    # weird, but if reverse flow is short enough, it might only
-                    # stay in the flow cache for a very short period of time
-                    if revflow.endofflow:
-                        self.unmeasure_flow(revflow, prevnode)
-
-                    destnode = fscore().topology.destnode(self.name, revflow.dstaddr)
-
-                    # guard against case that we can't do the autoack due to
-                    # no "real" source (i.e., source was spoofed or source addr
-                    # has no route)
-                    if destnode and destnode != self.name:
-                        self.forward(revflow, destnode)
-            else:
-                self.forward(flowlet, destnode)
+            self.forward(flowlet, destnode)
 
     def forward(self, flowlet, destnode):
         nextnode = self.nextHop(flowlet.dstaddr)
-        link = self.linkFromNexthopNode(nextnode, flowkey=flowlet.key)
-        link = link or self.default_link
+        port = self.portFromNexthopNode(nextnode, flowkey=flowlet.key)
+        link = port.link or self.default_link
+        flowlet.srcmac,flowlet.dstmac = port.localmac, port.remotemac
         link.flowlet_arrival(flowlet, self.name, destnode)   
-

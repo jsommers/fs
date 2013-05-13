@@ -7,7 +7,6 @@ class SubtractiveTrafficGenerator(TrafficGenerator):
         TrafficGenerator.__init__(self, srcnode)
         self.dstnode = dstnode
         self.logger.debug('subtractive: %s %s %s %s %s %s' % (srcnode,dstnode,action,ipdstfilt, ipsrcfilt, ipprotofilt))
-        # print >>sys.stderr, 'subtractive: %s %s %s %s %s %s' % (srcnode,dstnode,action,ipdstfilt, ipsrcfilt, ipprotofilt)
 
         self.ipdstfilt = self.ipsrcfilt = ''
         self.ipprotofilt = 0
@@ -33,4 +32,4 @@ class SubtractiveTrafficGenerator(TrafficGenerator):
         # at end, set done to True
         f = SubtractiveFlowlet(FlowIdent(self.ipsrcfilt, self.ipdstfilt, ipproto=self.ipprotofilt), action=self.action)
         self.logger.info('Subtractive generator callback')
-        fscore().node(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode, 'host')
+        fscore().node(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode)

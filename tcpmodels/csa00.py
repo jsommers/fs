@@ -95,7 +95,11 @@ def model(bytes, mss, rtt, interval, p):
     nintervals = max(nintervals, 1)
     avgemit = bytes/nintervals
 
-    return flowduration, avgemit
+    def byteemit():
+        for i in xrange(int(nintervals)+1):
+            yield avgemit
+
+    return flowduration, byteemit()
 
 
 if __name__ == '__main__':

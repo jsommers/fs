@@ -15,7 +15,7 @@ except:
     pass
 
 class HarpoonTrafficGenerator(TrafficGenerator):
-    def __init__(self, srcnode, ipsrc='0.0.0.0', ipdst='0.0.0.0', sport=0, dport=0, flowsize=1500, pktsize=1500, flowstart=0, ipproto=socket.IPPROTO_TCP, lossrate=0.001, mss=1460, emitprocess='randomchoice(x)', iptos=0x0, xopen=True, tcpmodel='csa00'):
+    def __init__(self, srcnode, ipsrc='0.0.0.0', ipdst='0.0.0.0', sport=0, dport=0, flowsize=1500, pktsize=1500, flowstart=0, ipproto=socket.IPPROTO_TCP, lossrate=0.001, mss=1460, iptos=0x0, xopen=True, tcpmodel='csa00'):
         TrafficGenerator.__init__(self, srcnode)
         self.srcnet = ipaddr.IPNetwork(ipsrc)
         self.dstnet = ipaddr.IPNetwork(ipdst)
@@ -68,8 +68,6 @@ class HarpoonTrafficGenerator(TrafficGenerator):
         else:
             self.iptosrv = randomchoice(iptos)
 
-        self.emitrvstr = emitprocess
-
         self.xopen = xopen
         self.activeflows = {}
 
@@ -110,8 +108,7 @@ class HarpoonTrafficGenerator(TrafficGenerator):
         p = next(self.lossraterv)
         basertt = owd * 2.0
 
-        flowduration, avgemit = self.tcpmodel.model(flet.size, flet.mss, basertt, fscore().interval, p)
-        byteemit = eval(self.emitrvstr.replace('x', 'avgemit'))
+        flowduration, byteemit = self.tcpmodel.model(flet.size, flet.mss, basertt, fscore().interval, p)
 
         # FIXME: add an end timestamp onto flow to indicate its estimated
         # duration; routers along path can add that end to arrival time to get
@@ -174,9 +171,7 @@ class HarpoonTrafficGenerator(TrafficGenerator):
         if test:
             return fsend,numsent,emitrv,destnode
 
-
-        # print '0x%0x flags' % (fsend.tcpflags)
-        fscore().topology.node(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode, 'host')
+        fscore().topology.node(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode)
 
         # if there are more flowlets, schedule the next one
         if flowlet.bytes > 0:

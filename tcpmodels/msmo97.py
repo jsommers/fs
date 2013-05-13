@@ -19,7 +19,12 @@ def model(bytes, mss, rtt, interval, p):
     nintervals = max(nintervals, 1)
     avgemit = bytes/float(nintervals)
     assert(avgemit > 0.0)
-    return flowduration, avgemit
+
+    def byteemit():
+        for i in xrange(int(nintervals)+1):
+            yield avgemit
+
+    return flowduration, byteemit()
 
 if __name__ == '__main__':
     print tcpmodel(100, 256, 0.100, 1, 0.001)

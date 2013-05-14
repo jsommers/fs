@@ -232,6 +232,28 @@ class OpenflowSwitch(Node):
             self.interface_to_port_map[localip] = portnum
             self.logger.debug("New port in OF switch {}: {}".format(portnum, pi))
 
+    def send_gratuitous_arps(self):
+        '''Send ARPs for our own interfaces to each connected node'''
+        for pnum,pinfo in self.ports.iteritems():
+            if pnum == '127.0.0.1': # 'localhost' interface
+                continue
+            # construct an ARP request for one of our known interfaces.
+            # controller isn't included in any of these ports, so these
+            # are only ports connected to other switches
+            arp = pktlib.arp()
+            arp.opcode = pktlib.arp.REQUEST 
+            arp.hwsrc = pinfo.localmac
+            arp.protosrc = pinfo.localip
+            ethernet = pktlib.ethernet()
+            ethernet.dst = pktlib.ETHER_BROADCAST
+            ethernet.src = pinfo.localmac
+            ethernet.payload = arp
+            fscore().after(0.001, "arp {}:{}".format(self.name, pnum), self.pox_switch.rx_packet, ethernet, pnum)
+
+    def start(self):
+        Node.start(self)
+        self.send_gratuitous_arps()
+
 class OpenflowController(Node):
     __slots__ = ['components', 'switch_links']
 

@@ -15,6 +15,7 @@ from pytricia import PyTricia
 import time
 from fslib.common import *
 from fslib.util import default_ip_to_macaddr, subnet_generator
+from fslib.link import NullLink
 from socket import IPPROTO_TCP
 
 class MeasurementConfig(object):
@@ -225,10 +226,8 @@ class Node(object):
         else:
             self.node_measurements = NullMeasurement()
         self.ports = {}
-        localmac = Flowlet.LOCALMAC
-        self.ports['127.0.0.1'] = PortInfo(None, '127.0.0.1', '127.0.0.1', localmac, localmac)
         self.node_to_port_map = defaultdict(list)
-        self.logger = logging.getLogger(name)
+        self.logger = get_logger()
         self.__started = False
 
     @property
@@ -286,6 +285,8 @@ class Router(Node):
         self.autoack=kwargs.get('autoack',False)
         self.forwarding_table = PyTricia(32)
         self.default_link = None
+        localmac = Flowlet.LOCALMAC
+        self.ports['127.0.0.1'] = PortInfo(NullLink(), '127.0.0.1', '127.0.0.1', localmac, localmac)
 
     def setDefaultNextHop(self, nexthop):
         '''Set up a default next hop route.  Assumes that we just select the first link to the next

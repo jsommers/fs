@@ -138,3 +138,9 @@ class Link(object):
             fscore().after(wait, "link-decrbacklog-{}".format(self.egress_node.name), self.decrbacklog, flowlet.size)
 
         fscore().after(wait, "link-flowarrival-{}".format(self.egress_name, self.egress_ip), self.egress_node.flowlet_arrival, flowlet, prevnode, destnode, self.egress_ip)
+
+
+class NullLink(object):
+    def flowlet_arrival(self, *args):
+        pass
+    

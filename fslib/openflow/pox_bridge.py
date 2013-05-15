@@ -135,11 +135,13 @@ class PoxBridgeSoftwareSwitch(SoftwareSwitch):
         self.forward = fn
 
 class OpenflowSwitch(Node):
-    __slots__ = ['dpid', 'pox_switch', 'controller_name', 'controller_links', 'ipdests', 'interface_to_port_map', 'trafgen_ip', 'autoack']
+    __slots__ = ['dpid', 'pox_switch', 'controller_name', 'controller_links', 'ipdests', 
+                 'interface_to_port_map', 'trafgen_ip', 'autoack', 'trafgen_mac', 'dstmac_cache']
 
     def __init__(self, name, measurement_config, **kwargs):
         Node.__init__(self, name, measurement_config, **kwargs)
         self.dpid = abs(hash(name))
+        self.dstmac_cache = {}
         self.pox_switch = PoxBridgeSoftwareSwitch(self.dpid, name=name, 
             ports=0, miss_send_len=2**16, max_buffers=2**8, features=None)
         self.pox_switch.set_connection(self)
@@ -155,15 +157,26 @@ class OpenflowSwitch(Node):
 
         # explicitly add a localhost link/interface
         ipa,ipb = [ ip for ip in next(FsConfigurator.link_subnetter).iterhosts() ]
-        self.add_link(NullLink, ipa, ipb, 'remote', remotemac=default_ip_to_macaddr(ipb))
+        remotemac = default_ip_to_macaddr(ipb)
+        self.add_link(NullLink, ipa, ipb, 'remote', remotemac=remotemac)
         self.trafgen_ip = str(ipa)
+        self.trafgen_mac = remotemac
+        self.dstmac_cache[self.name] = remotemac
+
+    @property
+    def remote_macaddr(self):
+        return self.trafgen_mac
 
     def send_packet(self, packet, port_num):
         '''Forward a data plane packet out a given port'''
         flet = packet_to_flowlet(packet)
+
+        # has packet reached destination?
+        if flet is None or self.ipdests.get(flet.dstaddr, None):
+            return
+
         pinfo = self.ports[port_num]
-        # self.logger.debug("Switch sending translated packet {}->{} on port {} to {}".format(packet, flet, port_num, pinfo.link.egress_name))
-        flet.srcmac,flet.dstmac = pinfo.localmac,pinfo.remotemac
+        self.logger.debug("Switch sending translated packet {}->{} from {}->{} on port {} to {}".format(packet, flet, flet.srcmac, flet.dstmac, port_num, pinfo.link.egress_name))
         pinfo.link.flowlet_arrival(flet, self.name, pinfo.remoteip)
 
     def send(self, ofmessage):
@@ -218,12 +231,9 @@ class OpenflowSwitch(Node):
                 ofhdr.unpack(flowlet.ofmsg)
                 ofmsg = oflib._message_type_to_class[ofhdr.header_type]()
                 ofmsg.unpack(flowlet.ofmsg)
-                self.pox_switch.rx_message(self, ofmsg)
             else:
                 raise UnhandledPoxPacketFlowletTranslation("Not an openflow message from controller: {}".format(flowlet.ofmsg))
-
             self.pox_switch.rx_message(self, ofmsg)
-
 
         elif isinstance(flowlet, PoxFlowlet):
             self.logger.debug("Received PoxFlowlet: {}".format(str(flowlet.origpkt)))
@@ -237,27 +247,32 @@ class OpenflowSwitch(Node):
             # self.logger.info("Received flowlet in {} intf{} dstmac{} plocal{}  --  {}".format(self.name, input_intf, flowlet.dstmac, portinfo.localmac, type(flowlet)))
 
             if portinfo.link is NullLink:
-                flowlet.srcmac,flowlet.dstmac = portinfo.remotemac,portinfo.localmac
-                # self.logger.warn("Local flowlet: rewriting MAC addresses {}".format(portinfo))
-            elif flowlet.dstmac != portinfo.localmac:
-                self.logger.debug("Arriving flowlet dstmac does not match input port (probably flooded) {} {}".format(flowlet.dstmac, portinfo))
+                flowlet.srcmac = portinfo.remotemac
+                dstmac = self.dstmac_cache.get(destnode, None)
+                if dstmac is None:
+                    self.dstmac_cache[destnode] = dstmac = fscore().topology.node(destnode).remote_macaddr
+                flowlet.dstmac = dstmac
+                self.logger.debug("Local flowlet: setting MAC addrs as {}->{}".format(flowlet.srcmac, flowlet.dstmac))
+            else:
+                self.logger.debug("Non-local flowlet: MAC addrs {}->{}".format(flowlet.srcmac, flowlet.dstmac))
 
             self.measure_flow(flowlet, prevnode, input_intf)
             # assume this is an incoming flowlet on the dataplane.  
             # reformat it and inject it into the POX switch
             self.logger.debug("Flowlet arrival in OF switch {} {} {} {} {}".format(self.name, flowlet.dstaddr, prevnode, destnode, input_intf))
+
+            pkt = flowlet_to_packet(flowlet)
+            pkt.flowlet = None
+            self.pox_switch.rx_packet(pkt, input_port)
+
             if self.ipdests.get(flowlet.dstaddr, None):
                 self.logger.debug("Flowlet arrived at destination {}".format(self.name))
                 if self.autoack and not flowlet.ackflow:
-                    self.send_ack_flow(flowlet, prevnode, destnode, input_intf)
-            else:                
-                pkt = flowlet_to_packet(flowlet)
-                pkt.flowlet = flowlet
-                self.pox_switch.rx_packet(pkt, input_port)
+                    self.send_ack_flow(flowlet, input_intf)
         else:
             raise UnhandledPoxPacketFlowletTranslation("Unexpected message in OF switch: {}".format(type(flowlet)))
 
-    def send_ack_flow(self, flowlet, prevnode, destnode, input_intf):
+    def send_ack_flow(self, flowlet, input_intf):
         # print "constructing ack flow:", self.name, flowlet, prevnode, destnode, input_intf
         revident = flowlet.ident.mkreverse()
         revflet = Flowlet(revident)
@@ -270,10 +285,9 @@ class OpenflowSwitch(Node):
         revflet.ingress_intf = input_intf
         revflet.flowstart = fscore().now
         revflet.flowend = revflet.flowstart
-        # print revflet.srcmac,revflet.dstmac
         destnode = fscore().topology.destnode(self.name, revflet.dstaddr)
-        outport = self.ports[self.interface_to_port_map[input_intf]]
-        outport.link.flowlet_arrival(revflet, self.name, destnode)
+        self.logger.debug("Injecting reverse flow: {}->{}".format(revflet.srcmac, revflet.dstmac))
+        self.flowlet_arrival(revflet, self.name, destnode)
 
     def add_link(self, link, localip, remoteip, next_node, remotemac='ff:ff:ff:ff:ff:ff'):
         localip = str(localip)

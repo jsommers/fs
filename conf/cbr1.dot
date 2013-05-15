@@ -31,7 +31,7 @@ graph test {
     tail [ 
         type="OpenflowSwitch"
         controller="controllerx"
-        autoack="False"
+        autoack="True"
         ipdests="10.3.0.0/16 10.4.0.0/16 10.0.0.0/8" 
     ];
 

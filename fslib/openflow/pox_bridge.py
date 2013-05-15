@@ -52,7 +52,7 @@ def flowlet_to_packet(flowlet):
     etherhdr = pktlib.ethernet()
     etherhdr.src = EthAddr(flowlet.srcmac)
     etherhdr.dst = EthAddr(flowlet.dstmac)
-    get_logger().debug("MAC xlate: {}->{}, {}->{}".format(flowlet.srcmac, etherhdr.src, flowlet.dstmac, etherhdr.dst))
+    # get_logger().debug("MAC xlate: {}->{}, {}->{}".format(flowlet.srcmac, etherhdr.src, flowlet.dstmac, etherhdr.dst))
     etherhdr.type = pktlib.ethernet.IP_TYPE
 
     ipv4 = pktlib.ipv4() 
@@ -176,18 +176,18 @@ class OpenflowSwitch(Node):
             return
 
         pinfo = self.ports[port_num]
-        self.logger.debug("Switch sending translated packet {}->{} from {}->{} on port {} to {}".format(packet, flet, flet.srcmac, flet.dstmac, port_num, pinfo.link.egress_name))
+        # self.logger.debug("Switch sending translated packet {}->{} from {}->{} on port {} to {}".format(packet, flet, flet.srcmac, flet.dstmac, port_num, pinfo.link.egress_name))
         pinfo.link.flowlet_arrival(flet, self.name, pinfo.remoteip)
 
     def send(self, ofmessage):
         '''Callback function for POX SoftwareSwitch to send an outgoing OF message
         to controller.'''
         if not self.started:
-            self.logger.debug("OF switch-to-controller deferred message {}".format(ofmessage))
+            # self.logger.debug("OF switch-to-controller deferred message {}".format(ofmessage))
             evid = 'deferred switch->controller send'
             fscore().after(0.0, evid, self.send, ofmessage)
         else:
-            self.logger.debug("OF switch-to-controller {} - {}".format(str(self.controller_links[self.controller_name]), ofmessage))
+            # self.logger.debug("OF switch-to-controller {} - {}".format(str(self.controller_links[self.controller_name]), ofmessage))
             clink = self.controller_links[self.controller_name]
             self.controller_links[self.controller_name].flowlet_arrival(OpenflowMessage(FlowIdent(), ofmessage), self.name, self.controller_name)
 
@@ -198,7 +198,7 @@ class OpenflowSwitch(Node):
     def process_packet(self, poxpkt, inputport):
         '''Process an incoming POX packet.  Mainly want to check whether
         it's an ARP and update our ARP "table" state'''
-        self.logger.debug("Switch {} processing packet: {}".format(self.name, str(poxpkt)))
+        # self.logger.debug("Switch {} processing packet: {}".format(self.name, str(poxpkt)))
         if poxpkt.type == poxpkt.ARP_TYPE:
             if poxpkt.payload.opcode == pktlib.arp.REQUEST:
                 self.logger.debug("Got ARP request: {}".format(str(poxpkt.payload)))
@@ -212,7 +212,7 @@ class OpenflowSwitch(Node):
                         pinfo = PortInfo(pinfo.link, pinfo.localip, pinfo.remoteip, pinfo.localmac, str(arp.hwsrc))
                         self.ports[portnum] = pinfo
                         self.logger.debug("Learned MAC/IP mapping {}->{}".format(arp.hwsrc,srcip))
-                        self.logger.debug("Updated {} -> {}".format(portnum, self.ports))
+                        # self.logger.debug("Updated {} -> {}".format(portnum, self.ports))
 
 
     def flowlet_arrival(self, flowlet, prevnode, destnode, input_intf=None):
@@ -252,14 +252,14 @@ class OpenflowSwitch(Node):
                 if dstmac is None:
                     self.dstmac_cache[destnode] = dstmac = fscore().topology.node(destnode).remote_macaddr
                 flowlet.dstmac = dstmac
-                self.logger.debug("Local flowlet: setting MAC addrs as {}->{}".format(flowlet.srcmac, flowlet.dstmac))
-            else:
-                self.logger.debug("Non-local flowlet: MAC addrs {}->{}".format(flowlet.srcmac, flowlet.dstmac))
+                # self.logger.debug("Local flowlet: setting MAC addrs as {}->{}".format(flowlet.srcmac, flowlet.dstmac))
+            #else:
+            #    # self.logger.debug("Non-local flowlet: MAC addrs {}->{}".format(flowlet.srcmac, flowlet.dstmac))
 
             self.measure_flow(flowlet, prevnode, input_intf)
             # assume this is an incoming flowlet on the dataplane.  
             # reformat it and inject it into the POX switch
-            self.logger.debug("Flowlet arrival in OF switch {} {} {} {} {}".format(self.name, flowlet.dstaddr, prevnode, destnode, input_intf))
+            # self.logger.debug("Flowlet arrival in OF switch {} {} {} {} {}".format(self.name, flowlet.dstaddr, prevnode, destnode, input_intf))
 
             pkt = flowlet_to_packet(flowlet)
             pkt.flowlet = None
@@ -286,7 +286,7 @@ class OpenflowSwitch(Node):
         revflet.flowstart = fscore().now
         revflet.flowend = revflet.flowstart
         destnode = fscore().topology.destnode(self.name, revflet.dstaddr)
-        self.logger.debug("Injecting reverse flow: {}->{}".format(revflet.srcmac, revflet.dstmac))
+        # self.logger.debug("Injecting reverse flow: {}->{}".format(revflet.srcmac, revflet.dstmac))
         self.flowlet_arrival(revflet, self.name, destnode)
 
     def add_link(self, link, localip, remoteip, next_node, remotemac='ff:ff:ff:ff:ff:ff'):
@@ -358,11 +358,11 @@ class OpenflowController(Node):
     def controller_to_switch(self, switchname, mesg):
         '''Ferry an OF message from controller to switch'''
         if not self.started:
-            self.logger.debug("OF controller-to-switch deferred message {}".format(mesg))
+            # self.logger.debug("OF controller-to-switch deferred message {}".format(mesg))
             evid = 'deferred controller->switch send'
             fscore().after(0, evid, self.controller_to_switch, switchname, mesg)
         else:
-            self.logger.debug("OF controller-to-switch {}->{}: {}".format(self.name, switchname, mesg))
+            # self.logger.debug("OF controller-to-switch {}->{}: {}".format(self.name, switchname, mesg))
             link = self.switch_links[switchname][1]
             link.flowlet_arrival(OpenflowMessage(FlowIdent(), mesg), self.name, switchname)
        

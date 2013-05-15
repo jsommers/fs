@@ -1,5 +1,8 @@
+import sys
+
 from socket import IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP
 import logging
+from ipaddr import IPv4Address
 
 from pox.datapaths.switch import SoftwareSwitch
 from pox.openflow import libopenflow_01 as oflib
@@ -10,9 +13,11 @@ from fslib.openflow import load_pox_component
 import pox.core
 
 from fslib.node import Node, PortInfo
+from fslib.link import NullLink
 from fslib.common import fscore, get_logger
 from fslib.flowlet import Flowlet, FlowIdent
 from fslib.util import default_ip_to_macaddr
+from fslib.configurator import FsConfigurator
 
 from pytricia import PyTricia
 
@@ -83,6 +88,7 @@ def packet_to_flowlet(pkt):
         return getattr(pkt, "origflet")
     except AttributeError,e:
         log = get_logger()
+        flet = None
         ip = pkt.find('ipv4')
         if ip is None:
             flet = PoxFlowlet(FlowIdent())
@@ -127,7 +133,7 @@ class PoxBridgeSoftwareSwitch(SoftwareSwitch):
         self.forward = fn
 
 class OpenflowSwitch(Node):
-    __slots__ = ['dpid', 'pox_switch', 'controller_name', 'controller_links', 'ipdests', 'interface_to_port_map']
+    __slots__ = ['dpid', 'pox_switch', 'controller_name', 'controller_links', 'ipdests', 'interface_to_port_map', 'trafgen_ip']
 
     def __init__(self, name, measurement_config, **kwargs):
         Node.__init__(self, name, measurement_config, **kwargs)
@@ -138,26 +144,22 @@ class OpenflowSwitch(Node):
         self.pox_switch.set_output_packet_callback(self. send_packet)
         self.controller_name = kwargs.get('controller', 'controller')
         self.controller_links = {}
+        self.interface_to_port_map = {}
 
         self.ipdests = PyTricia()
         for prefix in kwargs.get('ipdests','').split():
             self.ipdests[prefix] = True
 
         # explicitly add a localhost link/interface
-        localmac = Flowlet.LOCALMAC
-        self.ports[1] = PortInfo(link=None, localip='127.0.0.1', remoteip=None, localmac=localmac, remotemac=None)
-        self.node_to_port_map['host'].append(1)
-        self.pox_switch.add_port(1)
-        self.pox_switch.ports[1].enable_config(oflib.OFPPC_NO_FWD)
-        self.interface_to_port_map = {}
-        self.interface_to_port_map['host'] = 1
-        self.interface_to_port_map['127.0.0.1'] = 1
+        ipa,ipb = [ ip for ip in next(FsConfigurator.link_subnetter).iterhosts() ]
+        self.add_link(NullLink, ipa, ipb, 'remote', remotemac=default_ip_to_macaddr(ipb))
+        self.trafgen_ip = str(ipa)
 
     def send_packet(self, packet, port_num):
         '''Forward a data plane packet out a given port'''
         flet = packet_to_flowlet(packet)
-        self.logger.debug("Switch sending translated packet {}->{} on port {}".format(packet, flet, port_num))
         pinfo = self.ports[port_num]
+        self.logger.warn("Switch sending translated packet {}->{} on port {} to {}".format(packet, flet, port_num, pinfo.link.egress_name))
         flet.srcmac,flet.dstmac = pinfo.localmac,pinfo.remotemac
         pinfo.link.flowlet_arrival(flet, self.name, pinfo.remoteip)
 
@@ -177,9 +179,35 @@ class OpenflowSwitch(Node):
         '''Dummy callback function for POX SoftwareSwitchBase'''
         pass
 
-    def flowlet_arrival(self, flowlet, prevnode, destnode, input_intf="127.0.0.1"):
+    def process_packet(self, poxpkt, inputport):
+        '''Process an incoming POX packet.  Mainly want to check whether
+        it's an ARP and update our ARP "table" state'''
+        self.logger.warn("Switch {} processing packet: {}".format(self.name, str(poxpkt)))
+        if poxpkt.type == poxpkt.ARP_TYPE:
+            # print "Arp type"
+            if poxpkt.payload.opcode == pktlib.arp.REQUEST:
+                self.logger.warn("Got ARP request: {}".format(str(poxpkt.payload)))
+                arp = poxpkt.payload
+                # print self.ports
+                # print self.interface_to_port_map
+                dstip = str(IPv4Address(arp.protodst))
+                srcip = str(IPv4Address(arp.protosrc))
+                if dstip in self.interface_to_port_map:
+                    portnum = self.interface_to_port_map[dstip]
+                    pinfo = self.ports[portnum]
+                    if not pinfo.remotemac:
+                        self.logger.debug("Learned MAC/IP mapping {}->{}".format(arp.hwsrc,srcip))
+                        pinfo = PortInfo(pinfo.link, pinfo.localip, pinfo.remoteip, pinfo.localmac, str(arp.hwsrc))
+                        self.ports[portnum] = pinfo
+                        # print pinfo
+
+
+    def flowlet_arrival(self, flowlet, prevnode, destnode, input_intf=None):
         '''Incoming flowlet: determine whether it's a data plane flowlet or whether it's an OF message
         coming back from the controller'''
+        if input_intf is None:
+            input_intf = self.trafgen_ip
+
         if isinstance(flowlet, OpenflowMessage):
             self.logger.debug("Received from controller: {}".format(flowlet.ofmsg))
             ofmsg = None
@@ -196,20 +224,32 @@ class OpenflowSwitch(Node):
 
             self.pox_switch.rx_message(self, ofmsg)
 
+
+        elif isinstance(flowlet, PoxFlowlet):
+            self.logger.warn("Received PoxFlowlet: {}".format(str(flowlet.origpkt)))
+            input_port = self.interface_to_port_map[input_intf]
+            self.process_packet(flowlet.origpkt, input_port)
+            self.pox_switch.rx_packet(flowlet.origpkt, input_port)
+
         elif isinstance(flowlet, Flowlet):
             input_port = self.interface_to_port_map[input_intf]
             portinfo = self.ports[input_port]
 
-            if flowlet.dstmac != portinfo.localmac:
+            self.logger.info("Received flowlet in {} intf{} dstmac{} plocal{}  --  {}".format(self.name, input_intf, flowlet.dstmac, portinfo.localmac, type(flowlet)))
+
+            if portinfo.link is NullLink:
+                flowlet.srcmac,flowlet.dstmac = portinfo.remotemac,portinfo.localmac
+                self.logger.warn("Local flowlet: rewriting MAC addresses {}".format(portinfo))
+            elif flowlet.dstmac != portinfo.localmac:
                 self.logger.warn("Arriving flowlet dstmac does not match input port {} {}".format(flowlet.dstmac, portinfo))
 
             self.measure_flow(flowlet, prevnode, input_intf)
             # assume this is an incoming flowlet on the dataplane.  
             # reformat it and inject it into the POX switch
-            self.logger.debug("Flowlet arrival in OF switch {} {} {} {}".format(flowlet.dstaddr, prevnode, destnode, input_intf))
+            self.logger.debug("Flowlet arrival in OF switch {} {} {} {} {}".format(self.name, flowlet.dstaddr, prevnode, destnode, input_intf))
             if self.ipdests.get(flowlet.dstaddr, None):
                 # FIXME: autoack
-                pass
+                self.logger.debug("Flowlet arrived at destination {}".format(self.name))
             else:                
                 pkt = flowlet_to_packet(flowlet)
                 pkt.flowlet = flowlet
@@ -217,14 +257,15 @@ class OpenflowSwitch(Node):
         else:
             raise UnhandledPoxPacketFlowletTranslation("Unexpected message in OF switch: {}".format(type(flowlet)))
 
-    def add_link(self, link, localip, remoteip, next_node):
+    def add_link(self, link, localip, remoteip, next_node, remotemac=''):
+        localip = str(localip)
+        remoteip = str(remoteip)
         if next_node == self.controller_name:
             self.logger.debug("Adding link to {}: {}".format(self.name, link))
             self.controller_links[self.controller_name] = link
         else:
             portnum = len(self.ports) + 1
             localmac = "00:00:00:00:%02x:%02x" % (self.dpid % 255, portnum)
-            remotemac = "Unknown"
             pi = PortInfo(link, localip, remoteip, localmac, remotemac)
             self.ports[portnum] = pi
             self.node_to_port_map[next_node].append(portnum)
@@ -234,25 +275,33 @@ class OpenflowSwitch(Node):
 
     def send_gratuitous_arps(self):
         '''Send ARPs for our own interfaces to each connected node'''
+        print 'gratarp',self.ports
         for pnum,pinfo in self.ports.iteritems():
-            if pnum == '127.0.0.1': # 'localhost' interface
-                continue
+            print "gratarp",pnum,pinfo
             # construct an ARP request for one of our known interfaces.
             # controller isn't included in any of these ports, so these
             # are only ports connected to other switches
             arp = pktlib.arp()
             arp.opcode = pktlib.arp.REQUEST 
             arp.hwsrc = pinfo.localmac
-            arp.protosrc = pinfo.localip
+            arp.protosrc = int(IPv4Address(pinfo.localip))
+            arp.protodst = int(IPv4Address(pinfo.remoteip))
             ethernet = pktlib.ethernet()
             ethernet.dst = pktlib.ETHER_BROADCAST
             ethernet.src = pinfo.localmac
             ethernet.payload = arp
-            fscore().after(0.001, "arp {}:{}".format(self.name, pnum), self.pox_switch.rx_packet, ethernet, pnum)
+            ethernet.type = ethernet.ARP_TYPE
+            flet = packet_to_flowlet(ethernet)
+            pinfo.link.flowlet_arrival(flet, self.name, pinfo.link.egress_node_name)
 
     def start(self):
         Node.start(self)
-        self.send_gratuitous_arps()
+        fscore().after(0.010, "arp {}".format(self.name), self.send_gratuitous_arps)
+        print "switch ready to start:"
+        print self.ports
+        print self.interface_to_port_map
+        print self.node_to_port_map
+
 
 class OpenflowController(Node):
     __slots__ = ['components', 'switch_links']
@@ -292,3 +341,4 @@ class OpenflowController(Node):
         for component in self.components:
             self.logger.debug("Starting OF Controller Component {}".format(component))
             load_pox_component(component)
+

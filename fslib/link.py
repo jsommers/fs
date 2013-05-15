@@ -35,7 +35,7 @@ class Link(object):
         self.lastalarm = -1
         self.alarminterval = 30
         self.doqdelay = True
-        self.logger = get_logger()
+        self.logger = get_logger("link {}->{}".format(self.ingress_node.name, self.egress_node.name))
 
     def __str__(self):
         return "Link {}->{}".format(self.ingress_name, self.egress_name)
@@ -93,6 +93,10 @@ class Link(object):
         get_logger().error("Can't parse link delay: {}".format(delay))
         sys.exit(-1)
 
+    @property
+    def egress_node_name(self):
+        return self.egress_node.name
+
     @staticmethod
     def make_portname(node, port):
         '''
@@ -104,14 +108,14 @@ class Link(object):
         '''
         Set the egress ip address of the link.
         '''
-        self.egress_ip = ip
+        self.egress_ip = str(ip)
         self.egress_name = Link.make_portname(self.egress_node.name, self.egress_ip)
 
     def set_ingress_ip(self, ip):
         '''
         Set the ingress ip address of the link.
         '''
-        self.ingress_ip = ip
+        self.ingress_ip = str(ip)
         self.ingress_name = Link.make_portname(self.ingress_node.name, self.ingress_ip)
 
     def decrbacklog(self, amt):
@@ -140,7 +144,20 @@ class Link(object):
         fscore().after(wait, "link-flowarrival-{}".format(self.egress_name, self.egress_ip), self.egress_node.flowlet_arrival, flowlet, prevnode, destnode, self.egress_ip)
 
 
-class NullLink(object):
+class NullLinkClass(object):
+    '''Link null object'''
+    IDENT='local null link'
     def flowlet_arrival(self, *args):
         pass
+
+    @property
+    def egress_name(self):
+        return NullLinkClass.IDENT
+
+    @property
+    def egress_node_name(self):
+        return NullLinkClass.IDENT
+
+# a singleton
+NullLink = NullLinkClass()
     

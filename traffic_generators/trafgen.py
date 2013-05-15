@@ -7,7 +7,7 @@ class TrafficGenerator(object):
     def __init__(self, srcnode):
         self.srcnode = srcnode
         self.done = False
-        self.logger = get_logger()
+        self.logger = get_logger("tgen {}".format(self.srcnode))
         
     @abstractmethod
     def start(self):

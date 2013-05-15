@@ -15,7 +15,6 @@ from pox.datapaths.switch import SoftwareSwitchBase
 from pox.openflow import libopenflow_01 as oflib
 import pox.openflow.of_01 as ofcore
 
-
 class RuntimeError(Exception):
     pass
 
@@ -110,6 +109,9 @@ class FakeOpenflowConnection(ofcore.Connection):
     def close(self):
         pass
 
+def get_pox_logger(*args, **kwargs):
+    return get_logger()
+
 def monkey_patch_pox():
     '''Override two key bits of POX functionality: the Timer class and
     the openflow connection class.  Other overrides are mainly to ensure
@@ -127,6 +129,7 @@ def monkey_patch_pox():
     setattr(pox, "misc", fakerlib)
     setattr(ofcore, "Connection", FakeOpenflowConnection)
     setattr(ofcore, "OpenFlow_01_Task", fakerlib)
+    setattr(pox.core, "getLogger", get_pox_logger)
 
 
 def load_pox_component(name):

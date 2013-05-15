@@ -104,7 +104,7 @@ class FsCore(object):
 
     def run(self, scenario, configonly=False):
         '''Start the simulation using a particular scenario filename'''
-        cfg = FsConfigurator(self.debug)
+        cfg = FsConfigurator()
         if scenario:
             root, ext = os.path.splitext(scenario)
             self.__topology = cfg.load_config(scenario, configtype=ext[1:])

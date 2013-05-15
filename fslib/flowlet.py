@@ -42,12 +42,11 @@ class FlowIdent(object):
         return self.__key
 
 class Flowlet(object):
-    LOCALMAC = "02:00:00:00:00:00"
     __slots__ = ['__srcmac','__dstmac','__mss','__iptos','__pkts',
                  '__bytes','__flowident','__tcpflags','__ackflow',
                  '__flowstart','__flowend','ingress_intf']
     def __init__(self, ident, 
-                 srcmac=LOCALMAC, dstmac=LOCALMAC,
+                 srcmac=None, dstmac=None,
                  pkts=0, bytes=0, tcpflags=0):
         self.__flowident = ident
         self.__flowstart = -1.0

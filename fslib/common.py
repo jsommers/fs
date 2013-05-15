@@ -6,26 +6,22 @@ import logging
 
 LOG_FORMAT = '%(created)9.4f %(name)-12s %(levelname)-8s %(message)s'
 
-_applog = None
 def setup_logger(logfile, debug):
     loglevel = logging.INFO
     if debug:
         loglevel = logging.DEBUG
 
-    applog = logging.getLogger('fs')
     logging.basicConfig(level=loglevel, format=LOG_FORMAT)
 
+    applog = logging.getLogger()
     if logfile:
         h = logging.FileHandler(logfile)
         h.setLevel(loglevel)
         h.setFormatter(logging.Formatter(LOG_FORMAT))
         applog.addHandler(h)
 
-    global _applog
-    _applog = applog
-
-def get_logger():
-    return _applog
+def get_logger(name='fs'):
+    return logging.getLogger(name)
 
 def _fs_monkeypatch(obj):
     '''monkey patch current time function in time module to give

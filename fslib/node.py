@@ -14,9 +14,9 @@ import networkx
 from pytricia import PyTricia
 import time
 from fslib.common import *
-from fslib.util import default_ip_to_macaddr, subnet_generator
 from fslib.link import NullLink
 from socket import IPPROTO_TCP
+
 
 class MeasurementConfig(object):
     __slots__ = ['__counterexport','__exporttype','__exportinterval','__exportfile','__pktsampling','__flowsampling','__maintenance_cycle','__longflowtmo','__flowinactivetmo']
@@ -227,7 +227,7 @@ class Node(object):
             self.node_measurements = NullMeasurement()
         self.ports = {}
         self.node_to_port_map = defaultdict(list)
-        self.logger = get_logger()
+        self.logger = get_logger(self.name)
         self.__started = False
 
     @property
@@ -268,25 +268,27 @@ class Node(object):
         '''Add a new interface and link to this node.  link is the link object connecting
         this node to next_node.  hostip is the ip address assigned to the local interface for this
         link, and remoteip is the ip address assigned to the remote interface of the link.'''
-        localmac = default_ip_to_macaddr(localip)
-        remotemac = default_ip_to_macaddr(remoteip)
-        self.ports[localip] = PortInfo(link, localip, remoteip, localmac, remotemac)
+        localip = str(localip)
+        remoteip = str(remoteip)
+        self.ports[localip] = PortInfo(link, localip, remoteip, None, None)
         self.node_to_port_map[next_node].append(localip)
-
 
 class ForwardingFailure(Exception):
     pass
 
 class Router(Node):
-    __slots__ = ['autoack', 'forwarding_table', 'default_link']
+    __slots__ = ['autoack', 'forwarding_table', 'default_link', 'trafgen_ip']
 
     def __init__(self, name, measurement_config, **kwargs): 
         Node.__init__(self, name, measurement_config, **kwargs)
         self.autoack=kwargs.get('autoack',False)
         self.forwarding_table = PyTricia(32)
         self.default_link = None
-        localmac = Flowlet.LOCALMAC
-        self.ports['127.0.0.1'] = PortInfo(NullLink(), '127.0.0.1', '127.0.0.1', localmac, localmac)
+
+        from fslib.configurator import FsConfigurator
+        ipa,ipb = [ ip for ip in next(FsConfigurator.link_subnetter).iterhosts() ]
+        self.add_link(NullLink, ipa, ipb, 'remote')
+        self.trafgen_ip = str(ipa)
 
     def setDefaultNextHop(self, nexthop):
         '''Set up a default next hop route.  Assumes that we just select the first link to the next
@@ -325,7 +327,11 @@ class Router(Node):
             return xlist[hash(destip) % len(xlist)]
         raise ForwardingFailure()
 
-    def flowlet_arrival(self, flowlet, prevnode, destnode, input_ip="127.0.0.1"):
+    def flowlet_arrival(self, flowlet, prevnode, destnode, input_ip=None):
+        if input_ip is None:
+            input_ip = self.trafgen_ip
+        input_port = self.ports[input_ip]
+
         if isinstance(flowlet, SubtractiveFlowlet):
             killlist = []
             ok = []
@@ -343,10 +349,6 @@ class Router(Node):
             return
 
         # a "normal" Flowlet object
-        input_port = self.ports[input_ip]
-        if flowlet.dstmac != input_port.localmac:
-            self.logger.warn("Received flowlet with MAC address that doesn't match input port: {} - {}".format(flowlet.dstmac, input_port))
-
         self.measure_flow(flowlet, prevnode, str(input_port.localip))
 
         if flowlet.endofflow:
@@ -394,5 +396,4 @@ class Router(Node):
         nextnode = self.nextHop(flowlet.dstaddr)
         port = self.portFromNexthopNode(nextnode, flowkey=flowlet.key)
         link = port.link or self.default_link
-        flowlet.srcmac,flowlet.dstmac = port.localmac, port.remotemac
         link.flowlet_arrival(flowlet, self.name, destnode)   

@@ -83,7 +83,7 @@ class HarpoonTrafficGenerator(TrafficGenerator):
         fscore().after(startt, 'harpoon-start'+str(self.srcnode), self.newflow)
 
 
-    def newflow(self, test=False, xint=1.0):
+    def newflow(self, xint=1.0):
         if self.done:
             print 'harpoon generator done'
             return
@@ -93,11 +93,8 @@ class HarpoonTrafficGenerator(TrafficGenerator):
         flet = self.__makeflow()
         self.activeflows[flet.key] = 1
 
-        destnode = 'test'
-        owd = random.random()*0.05
-        if not test:
-            destnode = fscore().topology.destnode(self.srcnode, flet.dstaddr)
-            owd = fscore().topology.owd(self.srcnode, destnode)
+        destnode = fscore().topology.destnode(self.srcnode, flet.dstaddr)
+        owd = fscore().topology.owd(self.srcnode, destnode)
 
         # owd may be None if routing is temporarily broken because of
         # a link being down and no reachability
@@ -128,7 +125,7 @@ class HarpoonTrafficGenerator(TrafficGenerator):
             fscore().after(nextst, 'newflow-'+str(self.srcnode), self.newflow)
 
 
-    def flowemit(self, flowlet, numsent, emitrv, destnode, test=False):
+    def flowemit(self, flowlet, numsent, emitrv, destnode):
         fsend = copy(flowlet)
         fsend.bytes = int(min(next(emitrv), flowlet.bytes)) 
         flowlet.bytes -= fsend.bytes
@@ -167,9 +164,6 @@ class HarpoonTrafficGenerator(TrafficGenerator):
             fsend.tcpflags = flags
 
         numsent += 1
-
-        if test:
-            return fsend,numsent,emitrv,destnode
 
         fscore().topology.node(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode)
 

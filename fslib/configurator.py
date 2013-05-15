@@ -39,9 +39,8 @@ class NullTopology(object):
         pass
 
 class Topology(NullTopology):
-    def __init__(self, graph, nodes, links, traffic_modulators, debug=False):
+    def __init__(self, graph, nodes, links, traffic_modulators):
         self.logger = get_logger()
-        self.debug = debug
         self.graph = graph
         self.nodes = nodes
         self.links = links
@@ -85,15 +84,9 @@ class Topology(NullTopology):
         for n in self.graph:
             self.routing[n] = single_source_dijkstra_path(self.graph, n)
 
-        if self.debug:
-            for n,d in self.graph.nodes_iter(data=True):
-                print n,d
-
         self.ipdestlpm = PyTricia()
         for n,d in self.graph.nodes_iter(data=True):
             dlist = d.get('ipdests','').split()
-            if self.debug:
-                print dlist,n
             for destipstr in dlist:
                 ipnet = ipaddr.IPNetwork(destipstr)
                 xnode = {}
@@ -256,9 +249,12 @@ class Topology(NullTopology):
 
 
 class FsConfigurator(object):
-    def __init__(self, debug):
-        self.debug = debug
-        self.logger = get_logger()
+    link_subnetter = None
+
+    def __init__(self):
+        self.logger = get_logger('fsconfig')
+        # FIXME: let this be configurable
+        FsConfigurator.link_subnetter = fsutil.subnet_generator("172.16.0.0/12", 2) 
 
     def __strip_strings(self):
         '''Clean up all the strings in the imported config.'''
@@ -335,7 +331,7 @@ class FsConfigurator(object):
          
         mconfig_dict = {'counterexport':False, 'flowexport':'null','counterexportinterval':0, 'counterexportfile':None, 'maintenance_cycle':60, 'pktsampling':1.0, 'flowsampling':1.0, 'longflowtmo':-1, 'flowinactivetmo':-1}
 
-        print "Reading config for graph {}.".format(self.graph.graph.get('name','(unnamed)'))
+        self.logger.info("Reading config for graph {}.".format(self.graph.graph.get('name','(unnamed)')))
 
         self.__strip_strings()
         self.__do_substitutions()
@@ -356,7 +352,7 @@ class FsConfigurator(object):
             raise InvalidConfiguration(s)
 
         measurement_config = MeasurementConfig(**mconfig_dict)
-        print "Running measurements on these nodes: <{}>".format(','.join(measurement_nodes))
+        self.logger.info("Running measurements on these nodes: <{}>".format(','.join(measurement_nodes)))
 
         for a,b,d in self.graph.edges(data=True):
             w = 1
@@ -370,26 +366,29 @@ class FsConfigurator(object):
 
         self.__configure_parallel_universe(measurement_config, measurement_nodes)
         self.__configure_traffic()
-        if self.debug:
-            self.__print_config()
-        return Topology(self.graph, self.nodes, self.links, self.traffic_modulators, debug=self.debug)
+        self.__print_config()
+        return Topology(self.graph, self.nodes, self.links, self.traffic_modulators)
 
     def __print_config(self):
-        print "*** Begin Configuration Dump ***".center(30)
-        print "*** nodes ***"
+        self.logger.debug("*** Begin Configuration Dump ***".center(30))
+        self.logger.debug("*** graph nodes ***")
         for n,d in self.graph.nodes(data=True):
-            print n,d
-        print "*** links ***"
+            self.logger.debug("{},{}".format(n,d))
+        self.logger.debug("*** graph links ***")
         for a,b,d in self.graph.edges(data=True):
-            print a,b,d
-        print "*** End Configuration Dump ***".center(30)
+            self.logger.debug("{}->{} -- {}".format(a,b,d))
+        self.logger.debug("*** fs objects ***")
+        for nname,nobj in self.nodes.iteritems():
+            self.logger.debug("{} -> {}".format(nname, nobj))
+        for xtup,lobj in self.links.iteritems():
+            self.logger.debug("link {}->{}: {}".format(xtup[0], xtup[1], lobj))
+        self.logger.debug("*** End Configuration Dump ***".center(30))
 
     def __addupd_router(self, rname, rdict, measurement_config):
         robj = None
         if rname not in self.nodes:
             ctype = rdict.get('type', 'Router')
-            if self.debug:
-                self.logger.debug('Adding node {} type {} config {}'.format(rname,ctype,rdict))
+            self.logger.debug('Adding node {} type {} config {}'.format(rname,ctype,rdict))
 
             # ctype is the ClassName of the node to construct.
             # the class may be in fslib.node or fslib.openflow
@@ -420,9 +419,6 @@ class FsConfigurator(object):
                 mc = None
             self.__addupd_router(rname, rdict, mc)
 
-        # FIXME: let this be configurable
-        subnetter = subnet_generator("172.16.0.0/12", 2) 
-
         for a,b,d in self.graph.edges_iter(data=True):
             self.logger.debug("Adding bidirectional link from {}-{} with data {}".format(a, b, d))
 
@@ -445,7 +441,7 @@ class FsConfigurator(object):
             self.graph[a][b][0]['capacity'] = cap
             self.graph[a][b][0]['delay'] = delay
 
-            ipa,ipb = [ ip for ip in next(subnetter).iterhosts() ]
+            ipa,ipb = [ ip for ip in next(FsConfigurator.link_subnetter).iterhosts() ]
 
             linkfwd = Link(cap, delay, ra, rb)
             linkrev = Link(cap, delay, rb, ra)

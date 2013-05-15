@@ -92,7 +92,7 @@ def packet_to_flowlet(pkt):
         ip = pkt.find('ipv4')
         if ip is None:
             flet = PoxFlowlet(FlowIdent())
-            log.warn("Received non-IP packet {} from POX: can't translate to fs".format(str(pkt.payload)))
+            log.debug("Received non-IP packet {} from POX: there's no direct translation to fs".format(str(pkt.payload)))
         else:
             dport = sport = tcpflags = 0
             if ip.protocol == IPPROTO_TCP:
@@ -159,7 +159,7 @@ class OpenflowSwitch(Node):
         '''Forward a data plane packet out a given port'''
         flet = packet_to_flowlet(packet)
         pinfo = self.ports[port_num]
-        self.logger.warn("Switch sending translated packet {}->{} on port {} to {}".format(packet, flet, port_num, pinfo.link.egress_name))
+        # self.logger.debug("Switch sending translated packet {}->{} on port {} to {}".format(packet, flet, port_num, pinfo.link.egress_name))
         flet.srcmac,flet.dstmac = pinfo.localmac,pinfo.remotemac
         pinfo.link.flowlet_arrival(flet, self.name, pinfo.remoteip)
 
@@ -182,14 +182,11 @@ class OpenflowSwitch(Node):
     def process_packet(self, poxpkt, inputport):
         '''Process an incoming POX packet.  Mainly want to check whether
         it's an ARP and update our ARP "table" state'''
-        self.logger.warn("Switch {} processing packet: {}".format(self.name, str(poxpkt)))
+        self.logger.debug("Switch {} processing packet: {}".format(self.name, str(poxpkt)))
         if poxpkt.type == poxpkt.ARP_TYPE:
-            # print "Arp type"
             if poxpkt.payload.opcode == pktlib.arp.REQUEST:
-                self.logger.warn("Got ARP request: {}".format(str(poxpkt.payload)))
+                self.logger.debug("Got ARP request: {}".format(str(poxpkt.payload)))
                 arp = poxpkt.payload
-                # print self.ports
-                # print self.interface_to_port_map
                 dstip = str(IPv4Address(arp.protodst))
                 srcip = str(IPv4Address(arp.protosrc))
                 if dstip in self.interface_to_port_map:
@@ -199,7 +196,6 @@ class OpenflowSwitch(Node):
                         self.logger.debug("Learned MAC/IP mapping {}->{}".format(arp.hwsrc,srcip))
                         pinfo = PortInfo(pinfo.link, pinfo.localip, pinfo.remoteip, pinfo.localmac, str(arp.hwsrc))
                         self.ports[portnum] = pinfo
-                        # print pinfo
 
 
     def flowlet_arrival(self, flowlet, prevnode, destnode, input_intf=None):
@@ -226,7 +222,7 @@ class OpenflowSwitch(Node):
 
 
         elif isinstance(flowlet, PoxFlowlet):
-            self.logger.warn("Received PoxFlowlet: {}".format(str(flowlet.origpkt)))
+            self.logger.debug("Received PoxFlowlet: {}".format(str(flowlet.origpkt)))
             input_port = self.interface_to_port_map[input_intf]
             self.process_packet(flowlet.origpkt, input_port)
             self.pox_switch.rx_packet(flowlet.origpkt, input_port)
@@ -240,7 +236,7 @@ class OpenflowSwitch(Node):
                 flowlet.srcmac,flowlet.dstmac = portinfo.remotemac,portinfo.localmac
                 # self.logger.warn("Local flowlet: rewriting MAC addresses {}".format(portinfo))
             elif flowlet.dstmac != portinfo.localmac:
-                self.logger.warn("Arriving flowlet dstmac does not match input port {} {}".format(flowlet.dstmac, portinfo))
+                self.logger.debug("Arriving flowlet dstmac does not match input port (probably flooded) {} {}".format(flowlet.dstmac, portinfo))
 
             self.measure_flow(flowlet, prevnode, input_intf)
             # assume this is an incoming flowlet on the dataplane.  
@@ -276,9 +272,7 @@ class OpenflowSwitch(Node):
 
     def send_gratuitous_arps(self):
         '''Send ARPs for our own interfaces to each connected node'''
-        print 'gratarp',self.ports
         for pnum,pinfo in self.ports.iteritems():
-            print "gratarp",pnum,pinfo
             # construct an ARP request for one of our known interfaces.
             # controller isn't included in any of these ports, so these
             # are only ports connected to other switches
@@ -298,11 +292,6 @@ class OpenflowSwitch(Node):
     def start(self):
         Node.start(self)
         fscore().after(0.010, "arp {}".format(self.name), self.send_gratuitous_arps)
-        print "switch ready to start:"
-        print self.ports
-        print self.interface_to_port_map
-        print self.node_to_port_map
-
 
 class OpenflowController(Node):
     __slots__ = ['components', 'switch_links']

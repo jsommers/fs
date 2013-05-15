@@ -11,6 +11,7 @@ from pox.lib.addresses import *
 import pox.openflow.of_01 as ofcore
 from fslib.openflow import load_pox_component
 import pox.core
+from pox.lib.util import dpid_to_str
 
 from fslib.node import Node, PortInfo
 from fslib.link import NullLink
@@ -51,6 +52,7 @@ def flowlet_to_packet(flowlet):
     etherhdr = pktlib.ethernet()
     etherhdr.src = EthAddr(flowlet.srcmac)
     etherhdr.dst = EthAddr(flowlet.dstmac)
+    get_logger().debug("MAC xlate: {}->{}, {}->{}".format(flowlet.srcmac, etherhdr.src, flowlet.dstmac, etherhdr.dst))
     etherhdr.type = pktlib.ethernet.IP_TYPE
 
     ipv4 = pktlib.ipv4() 
@@ -133,7 +135,7 @@ class PoxBridgeSoftwareSwitch(SoftwareSwitch):
         self.forward = fn
 
 class OpenflowSwitch(Node):
-    __slots__ = ['dpid', 'pox_switch', 'controller_name', 'controller_links', 'ipdests', 'interface_to_port_map', 'trafgen_ip']
+    __slots__ = ['dpid', 'pox_switch', 'controller_name', 'controller_links', 'ipdests', 'interface_to_port_map', 'trafgen_ip', 'autoack']
 
     def __init__(self, name, measurement_config, **kwargs):
         Node.__init__(self, name, measurement_config, **kwargs)
@@ -143,6 +145,7 @@ class OpenflowSwitch(Node):
         self.pox_switch.set_connection(self)
         self.pox_switch.set_output_packet_callback(self. send_packet)
         self.controller_name = kwargs.get('controller', 'controller')
+        self.autoack = kwargs.get('autoack', False)
         self.controller_links = {}
         self.interface_to_port_map = {}
 
@@ -192,10 +195,11 @@ class OpenflowSwitch(Node):
                 if dstip in self.interface_to_port_map:
                     portnum = self.interface_to_port_map[dstip]
                     pinfo = self.ports[portnum]
-                    if not pinfo.remotemac:
-                        self.logger.debug("Learned MAC/IP mapping {}->{}".format(arp.hwsrc,srcip))
+                    if pinfo.remotemac == "ff:ff:ff:ff:ff:ff":
                         pinfo = PortInfo(pinfo.link, pinfo.localip, pinfo.remoteip, pinfo.localmac, str(arp.hwsrc))
                         self.ports[portnum] = pinfo
+                        self.logger.debug("Learned MAC/IP mapping {}->{}".format(arp.hwsrc,srcip))
+                        self.logger.debug("Updated {} -> {}".format(portnum, self.ports))
 
 
     def flowlet_arrival(self, flowlet, prevnode, destnode, input_intf=None):
@@ -243,8 +247,9 @@ class OpenflowSwitch(Node):
             # reformat it and inject it into the POX switch
             self.logger.debug("Flowlet arrival in OF switch {} {} {} {} {}".format(self.name, flowlet.dstaddr, prevnode, destnode, input_intf))
             if self.ipdests.get(flowlet.dstaddr, None):
-                # FIXME: autoack
                 self.logger.debug("Flowlet arrived at destination {}".format(self.name))
+                if self.autoack and not flowlet.ackflow:
+                    self.send_ack_flow(flowlet, prevnode, destnode, input_intf)
             else:                
                 pkt = flowlet_to_packet(flowlet)
                 pkt.flowlet = flowlet
@@ -252,7 +257,25 @@ class OpenflowSwitch(Node):
         else:
             raise UnhandledPoxPacketFlowletTranslation("Unexpected message in OF switch: {}".format(type(flowlet)))
 
-    def add_link(self, link, localip, remoteip, next_node, remotemac=''):
+    def send_ack_flow(self, flowlet, prevnode, destnode, input_intf):
+        # print "constructing ack flow:", self.name, flowlet, prevnode, destnode, input_intf
+        revident = flowlet.ident.mkreverse()
+        revflet = Flowlet(revident)
+        revflet.srcmac,revflet.dstmac = flowlet.dstmac,flowlet.srcmac
+        revflet.ackflow = True
+        revflet.pkts = flowlet.pkts/2
+        revflet.bytes = revflet.pkts * 40
+        revflet.iptos = flowlet.iptos
+        revflet.tcpflags = flowlet.tcpflags
+        revflet.ingress_intf = input_intf
+        revflet.flowstart = fscore().now
+        revflet.flowend = revflet.flowstart
+        # print revflet.srcmac,revflet.dstmac
+        destnode = fscore().topology.destnode(self.name, revflet.dstaddr)
+        outport = self.ports[self.interface_to_port_map[input_intf]]
+        outport.link.flowlet_arrival(revflet, self.name, destnode)
+
+    def add_link(self, link, localip, remoteip, next_node, remotemac='ff:ff:ff:ff:ff:ff'):
         localip = str(localip)
         remoteip = str(remoteip)
         if next_node == self.controller_name:
@@ -278,12 +301,12 @@ class OpenflowSwitch(Node):
             # are only ports connected to other switches
             arp = pktlib.arp()
             arp.opcode = pktlib.arp.REQUEST 
-            arp.hwsrc = pinfo.localmac
+            arp.hwsrc = EthAddr(pinfo.localmac)
             arp.protosrc = int(IPv4Address(pinfo.localip))
             arp.protodst = int(IPv4Address(pinfo.remoteip))
             ethernet = pktlib.ethernet()
             ethernet.dst = pktlib.ETHER_BROADCAST
-            ethernet.src = pinfo.localmac
+            ethernet.src = EthAddr(pinfo.localmac)
             ethernet.payload = arp
             ethernet.type = ethernet.ARP_TYPE
             flet = packet_to_flowlet(ethernet)
@@ -292,6 +315,10 @@ class OpenflowSwitch(Node):
     def start(self):
         Node.start(self)
         fscore().after(0.010, "arp {}".format(self.name), self.send_gratuitous_arps)
+        self.logger.debug("OF Switch Startup: {}".format(dpid_to_str(self.pox_switch.dpid)))
+        for p in self.ports:
+            self.logger.debug("\tSwitch port {}: {}, {}".format(p, self.ports[p], self.pox_switch.ports[p].show()))
+
 
 class OpenflowController(Node):
     __slots__ = ['components', 'switch_links']

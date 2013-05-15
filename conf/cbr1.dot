@@ -31,13 +31,13 @@ graph test {
     tail [ 
         type="OpenflowSwitch"
         controller="controllerx"
-        autoack="True"
+        autoack="False"
         ipdests="10.3.0.0/16 10.4.0.0/16 10.0.0.0/8" 
     ];
 
     controllerx [
         type="OpenflowController"
-	components="pox.forwarding.l2_learning"
+	components="pox.forwarding.hub"
     ];
 
     a [

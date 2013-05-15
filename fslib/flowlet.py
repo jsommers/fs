@@ -61,10 +61,6 @@ class Flowlet(object):
         self.tcpflags = 0x0
         self.ackflow = False
 
-    @property 
-    def broadcast(self):
-        return 
-
     @property
     def flowident(self):
         return self.__flowident

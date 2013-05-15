@@ -36,7 +36,7 @@ graph test {
 
     controller [
         type="OpenflowController"
-	    components="shortest_paths"
+	    components="pox.forwarding.l2_learning"
     ];
 
     a [

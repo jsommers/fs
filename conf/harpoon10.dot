@@ -14,7 +14,7 @@ graph test {
 
 
     head [ 
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
         ipdests="10.1.0.0/16"
         traffic="m1"
@@ -29,63 +29,63 @@ graph test {
     ];
 
     tail [ 
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
         ipdests="10.3.0.0/16 10.4.0.0/16 10.0.0.0/8" 
     ];
 
     controller [
-        type="ofcontroller"
-	    components="shortest_paths"
+        type="OpenflowController"
+	    components="pox.forwarding.l2_learning"
     ];
 
     a [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     b [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     c [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     d [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     e [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     f [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     g [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     h [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     i [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     j [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 

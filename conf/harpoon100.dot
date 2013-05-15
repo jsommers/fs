@@ -14,7 +14,7 @@ graph test {
 
 
     head [ 
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
         ipdests="10.1.0.0/16"
         traffic="m1"
@@ -29,513 +29,513 @@ graph test {
     ];
 
     tail [ 
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
         ipdests="10.3.0.0/16 10.4.0.0/16 10.0.0.0/8" 
     ];
 
     controller [
-        type="ofcontroller"
-	    components="shortest_paths"
+        type="OpenflowController"
+	    components="pox.forwarding.l2_learning"
     ];
 
     a [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     b [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     c [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     d [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     e [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     f [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     g [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     h [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     i [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     j [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     k [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     l [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     m [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     n [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     o [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     p [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     q [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     r [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     s [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     t [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     u [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     v [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     w [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     x [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     y [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     z [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     aa [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     bb [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     cc [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     dd [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ee [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ff [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     gg [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     hh [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ii [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     jj [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     kk [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ll [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     mm [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     nn [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     oo [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     pp [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     qq [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     rr [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ss [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     tt [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     uu [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     vv [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ww [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     xx [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     yy [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     zz [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     aaa [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     bbb [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ccc [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ddd [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     eee [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     fff [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ggg [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     hhh [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     iii [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     jjj [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     kkk [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     lll [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     mmm [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     nnn [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ooo [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ppp [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     qqq [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     rrr [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     sss [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ttt [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     uuu [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     vvv [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     www [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     xxx [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     yyy [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     zzz [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     aaaa [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     bbbb [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     cccc [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     dddd [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     eeee [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ffff [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     gggg [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     hhhh [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     iiii [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     jjjj [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     kkkk [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     llll [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     mmmm [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     nnnn [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     oooo [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     pppp [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     qqqq [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     rrrr [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     ssss [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     tttt [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     uuuu [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 
     vvvv [
-        type="ofswitch"
+        type="OpenflowSwitch"
         autoack="False"
     ]
 

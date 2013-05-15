@@ -234,12 +234,11 @@ class OpenflowSwitch(Node):
         elif isinstance(flowlet, Flowlet):
             input_port = self.interface_to_port_map[input_intf]
             portinfo = self.ports[input_port]
-
-            self.logger.info("Received flowlet in {} intf{} dstmac{} plocal{}  --  {}".format(self.name, input_intf, flowlet.dstmac, portinfo.localmac, type(flowlet)))
+            # self.logger.info("Received flowlet in {} intf{} dstmac{} plocal{}  --  {}".format(self.name, input_intf, flowlet.dstmac, portinfo.localmac, type(flowlet)))
 
             if portinfo.link is NullLink:
                 flowlet.srcmac,flowlet.dstmac = portinfo.remotemac,portinfo.localmac
-                self.logger.warn("Local flowlet: rewriting MAC addresses {}".format(portinfo))
+                # self.logger.warn("Local flowlet: rewriting MAC addresses {}".format(portinfo))
             elif flowlet.dstmac != portinfo.localmac:
                 self.logger.warn("Arriving flowlet dstmac does not match input port {} {}".format(flowlet.dstmac, portinfo))
 
@@ -264,12 +263,14 @@ class OpenflowSwitch(Node):
             self.logger.debug("Adding link to {}: {}".format(self.name, link))
             self.controller_links[self.controller_name] = link
         else:
-            portnum = len(self.ports) + 1
-            localmac = "00:00:00:00:%02x:%02x" % (self.dpid % 255, portnum)
+            portnum = len(self.ports)+1
+            self.pox_switch.add_port(portnum)
+            ofport = self.pox_switch.ports[portnum]
+            # let pox create local hw_addr and just use it
+            localmac = str(ofport.hw_addr)
             pi = PortInfo(link, localip, remoteip, localmac, remotemac)
             self.ports[portnum] = pi
             self.node_to_port_map[next_node].append(portnum)
-            self.pox_switch.add_port(portnum)
             self.interface_to_port_map[localip] = portnum
             self.logger.debug("New port in OF switch {}: {}".format(portnum, pi))
 

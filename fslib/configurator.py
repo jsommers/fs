@@ -41,7 +41,7 @@ class NullTopology(object):
 class Topology(NullTopology):
     def __init__(self, graph, nodes, links, traffic_modulators):
         self.logger = get_logger()
-        self.graph = graph
+        self.__graph = graph
         self.nodes = nodes
         self.links = links
         self.traffic_modulators = traffic_modulators
@@ -54,6 +54,14 @@ class Topology(NullTopology):
             if 'reliability' in d:
                 self.__configure_edge_reliability(a,b,d['reliability'],d)
 
+    @property
+    def graph(self):
+        return self.__graph
+
+    def remove_node(self, name):
+        self.__graph.remove_node(name)
+        for n in self.graph:
+            self.routing[n] = single_source_dijkstra_path(self.graph, n)
 
     def __configure_edge_reliability(self, a, b, relistr, edict):
         relidict = fsutil.mkdict(relistr)

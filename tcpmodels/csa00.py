@@ -90,6 +90,9 @@ def model(bytes, mss, rtt, interval, p):
     flowduration = max(flowduration, rtt)
 
     csa00bw = bytes / flowduration
+    print "flow duration",flowduration
+    print "flow rate",csa00bw
+
     nintervals = ceil(flowduration / interval)
 
     nintervals = max(nintervals, 1)
@@ -103,4 +106,4 @@ def model(bytes, mss, rtt, interval, p):
 
 
 if __name__ == '__main__':
-    print tcpmodel(100, 256, 0.100, 1, 0.001)
+    print model(1048576, 1470, 0.060, 1, 0.01)

@@ -11,6 +11,7 @@ def model(bytes, mss, rtt, interval, p):
     # C = 1.31
     # C = 0.93
     bw = mss / rtt * C/sqrt(p)
+    # print "bw computation",bw
 
     # how many intervals will this flowlet last?
     flowduration = bytes / bw
@@ -27,4 +28,4 @@ def model(bytes, mss, rtt, interval, p):
     return flowduration, byteemit()
 
 if __name__ == '__main__':
-    print tcpmodel(100, 256, 0.100, 1, 0.001)
+    print model(1048576, 1470, 0.060, 1, 0.01)

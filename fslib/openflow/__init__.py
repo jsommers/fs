@@ -1,5 +1,6 @@
 # version 1 OpenflowSwitch and OpenflowController
-# from ofmessage_v1 import * # from ofnode_v1 import *
+# from ofmessage_v1 import * 
+# from ofnode_v1 import *
 
 # version 2: direct integration and monkeypatching of POX
 
@@ -120,9 +121,7 @@ def monkey_patch_pox():
     get_logger().debug("Monkeypatching POX for integration with fs")
 
     fakerlib = PoxLibPlug()
-
     setattr(recoco, "Timer", FakePoxTimer)
-    setattr(pox.lib, "revent", fakerlib)
     setattr(pox.lib, "ioworker", fakerlib)
     setattr(pox.lib, "pxpcap", fakerlib)
     setattr(pox, "messenger", fakerlib)
@@ -143,7 +142,7 @@ def load_pox_component(name):
             raise RuntimeError()
         else:
             log.debug("Loading POX component {}".format(name))
-            m.launch()
+            m.launch(m.__dict__)
     except ImportError,e:
         log.error("Error trying to import {} POX component".format(name))
         raise RuntimeError()

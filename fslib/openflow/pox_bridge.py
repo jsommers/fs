@@ -63,6 +63,7 @@ def flowlet_to_packet(flowlet):
     ipv4.tos = flowlet.iptos
     iplen = flowlet.bytes / flowlet.pkts
     ipv4.iplen = iplen
+    payloadlen = 0
 
     etherhdr.payload = ipv4
 
@@ -75,7 +76,6 @@ def flowlet_to_packet(flowlet):
         layer4 = pktlib.udp()
         layer4.srcport = ident.sport 
         layer4.dstport = ident.dport 
-        payloadlen = max(iplen-28,0)
     elif ident.ipproto == IPPROTO_TCP:
         layer4 = pktlib.tcp()
         layer4.srcport = ident.sport 
@@ -84,10 +84,10 @@ def flowlet_to_packet(flowlet):
         layer4.off = 5
         payloadlen = max(iplen-40,0)
         layer4.tcplen = payloadlen
+        layer4.payload = spack('{}x'.format(payloadlen))
     else:
         raise UnhandledPoxPacketFlowletTranslation("Can't translate IP protocol {} from flowlet to POX packet".format(fident.ipproto))
     ipv4.payload = layer4
-    layer4.payload = spack('{}x'.format(payloadlen))
     etherhdr.origflet = flowlet
     return etherhdr
 

@@ -90,8 +90,8 @@ def model(bytes, mss, rtt, interval, p):
     flowduration = max(flowduration, rtt)
 
     csa00bw = bytes / flowduration
-    print "flow duration",flowduration
-    print "flow rate",csa00bw
+    # print "flow duration",flowduration
+    # print "flow rate",csa00bw
 
     nintervals = ceil(flowduration / interval)
 

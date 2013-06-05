@@ -17,7 +17,7 @@ graph test {
         ipdests="10.1.0.0/16"
         traffic="m1"
         // udp vbr flows 
-        m1="modulator start=0 generator=s1 profile=((3600,),(20,))"
+        m1="modulator start=0 generator=s1 profile=((3600,),(5,))"
         s1="simple ipsrc=10.1.1.0/24 ipdst=10.3.1.0/24 flowlets=1 dport=randomunifint(1024,65535) sport=randomunifint(1024,65535) ipproto=udp pkts=normal(600,10) bytes=normal(625000,100) continuous=True fps=1"
     ];
 

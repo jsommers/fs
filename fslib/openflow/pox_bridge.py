@@ -3,6 +3,7 @@ import sys
 from socket import IPPROTO_TCP, IPPROTO_UDP, IPPROTO_ICMP
 import logging
 from ipaddr import IPv4Address
+from struct import pack as spack
 
 from pox.datapaths.switch import SoftwareSwitch
 from pox.openflow import libopenflow_01 as oflib
@@ -60,7 +61,8 @@ def flowlet_to_packet(flowlet):
     ipv4.dstip = IPAddr(ident.dstip)
     ipv4.protocol = ident.ipproto
     ipv4.tos = flowlet.iptos
-    ipv4.iplen = flowlet.bytes / flowlet.pkts
+    iplen = flowlet.bytes / flowlet.pkts
+    ipv4.iplen = iplen
 
     etherhdr.payload = ipv4
 
@@ -68,19 +70,24 @@ def flowlet_to_packet(flowlet):
         layer4 = pktlib.icmp()
         layer4.type = ident.dport >> 8
         layer4.code = ident.dport & 0x00FF
+        payloadlen = max(iplen-28,0)
     elif ident.ipproto == IPPROTO_UDP:
         layer4 = pktlib.udp()
         layer4.srcport = ident.sport 
         layer4.dstport = ident.dport 
+        payloadlen = max(iplen-28,0)
     elif ident.ipproto == IPPROTO_TCP:
         layer4 = pktlib.tcp()
         layer4.srcport = ident.sport 
         layer4.dstport = ident.dport 
         layer4.flags = flowlet.tcpflags
+        layer4.off = 5
+        payloadlen = max(iplen-40,0)
+        layer4.tcplen = payloadlen
     else:
         raise UnhandledPoxPacketFlowletTranslation("Can't translate IP protocol {} from flowlet to POX packet".format(fident.ipproto))
     ipv4.payload = layer4
-    layer4.payload = str(flowlet)
+    layer4.payload = spack('{}x'.format(payloadlen))
     etherhdr.origflet = flowlet
     return etherhdr
 

@@ -22,7 +22,7 @@ class FsCore(object):
     simulation functionalities.'''
     inited = False
 
-    def __init__(self, interval, endtime=1.0, debug=False, progtick=0.05):
+    def __init__(self, interval, endtime=1.0, debug=0, progtick=0.05):
         if FsCore.inited:
             fscommon.get_logger().warn("Trying to initialize a new simulation object.")
             sys.exit(-1)
@@ -31,7 +31,7 @@ class FsCore(object):
         self.__debug = debug
         self.__interval = interval
         self.__now = 0.0
-        self.__logger = fscommon.get_logger()
+        self.__logger = fscommon.get_logger('fs.core')
 
         self.__heap = []
         self.endtime = endtime
@@ -124,7 +124,8 @@ class FsCore(object):
             if len(self.__heap) == 0:
                 break
             expire_time, evid, callback, fnargs = heappop(self.__heap)
-            self.logger.debug("FS event: '{}'' @{}".format(evid, expire_time))
+            if self.debug > 1:
+                self.logger.debug("FS event: '{}'' @{}".format(evid, expire_time))
             self.__now = expire_time
             callback(*fnargs)
             
@@ -140,8 +141,8 @@ def main():
     parser.add_option("-f", "--logfile", dest="logfile", 
                       default="", help="Send log to file (default: log to stderr)")
     parser.add_option("-d", "--debug", dest="debug", 
-                      default=False, action="store_true", 
-                      help="Turn on debugging output")
+                      default=0, action="count", 
+                      help="Turn on debugging output (may be given multiple times to increase debug output)")
     parser.add_option("-t", "--simtime", dest="simtime", 
                       default=300, type=int,
                       help="Set amount of simulation time (default: 300 sec)")

@@ -15,7 +15,7 @@ class FlowEventGenModulator(object):
         self.generators = {}
         self.generator_generator = gfunc
         self.starttime = stime
-        self.logger = get_logger("modulate")
+        self.logger = get_logger("fslib.traffic")
         if isinstance(self.starttime, (int, float)):
             self.starttime = randomchoice(self.starttime)
 

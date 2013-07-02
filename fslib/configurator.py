@@ -40,7 +40,7 @@ class NullTopology(object):
 
 class Topology(NullTopology):
     def __init__(self, graph, nodes, links, traffic_modulators):
-        self.logger = get_logger()
+        self.logger = get_logger('fslib.config')
         self.__graph = graph
         self.nodes = nodes
         self.links = links
@@ -260,7 +260,7 @@ class FsConfigurator(object):
     link_subnetter = None
 
     def __init__(self):
-        self.logger = get_logger('fsconfig')
+        self.logger = get_logger('fslib.config')
         # FIXME: let this be configurable
         FsConfigurator.link_subnetter = fsutil.subnet_generator("172.16.0.0/12", 2) 
 

@@ -21,7 +21,7 @@ from socket import IPPROTO_TCP
 class MeasurementConfig(object):
     __slots__ = ['__counterexport','__exporttype','__exportinterval','__exportfile','__pktsampling','__flowsampling','__maintenance_cycle','__longflowtmo','__flowinactivetmo']
     def __init__(self, **kwargs):
-        self.__counterexport = bool(kwargs.get('counterexport',False))
+        self.__counterexport = bool(eval(kwargs.get('counterexport',False)))
         self.__exporttype = kwargs.get('flowexport','null')
         self.__exportinterval = int(kwargs.get('counterexportinterval',1))
         self.__exportfile = kwargs.get('counterexportfile',None)
@@ -104,10 +104,11 @@ class NodeMeasurement(NullMeasurement):
         self.exporter = self.config.exportclass()(node_name)
 
     def start(self):
-        # start router maintenance loop at random within first 10 seconds
-        # maintenance loop periodically fires thereafter
-        # (below code is used to desynchronize router maintenance across net)
-
+        '''
+        start router maintenance loop at random within first 10 seconds.
+        maintenance loop periodically fires thereafter
+        (below code is used to desynchronize router maintenance across net)
+        '''
         fscore().after(random()*self.config.maintenance_cycle, 'node-flowexport-'+str(self.node_name), self.flow_export)
 
         if self.config.counterexport and self.config.exportinterval > 0:
@@ -170,14 +171,14 @@ class NodeMeasurement(NullMeasurement):
         flet = None
         if flowlet.key in self.flow_table:
             flet = self.flow_table[flowlet.key]
-            flet.flowend = fscore().now
+            # flet.flowend = fscore().now ### FIXME!!!
             flet += flowlet
         else:
             # NB: shallow copy of flowlet; will share same reference to
             # five tuple across the entire simulation
             newflow = 1
             flet = copy.copy(flowlet) 
-            flet.flowend += fscore().now
+            flet.flowend += fscore().now 
             flet.flowstart = fscore().now
             self.flow_table[flet.key] = flet
             flet.ingress_intf = "{}:{}".format(prevnode,inport)
@@ -281,7 +282,7 @@ class Router(Node):
 
     def __init__(self, name, measurement_config, **kwargs): 
         Node.__init__(self, name, measurement_config, **kwargs)
-        self.autoack=kwargs.get('autoack',False)
+        self.autoack=bool(eval(kwargs.get('autoack',False)))
         self.forwarding_table = PyTricia(32)
         self.default_link = None
 
@@ -355,7 +356,7 @@ class Router(Node):
             self.unmeasure_flow(flowlet, prevnode)
 
         if destnode == self.name:
-            if self.autoack and flowlet.ipproto == IPPROTO_TCP and not flowlet.ackflow:
+            if self.__should_make_acknowledgement_flow(flowlet):
                 revflow = Flowlet(flowlet.flowident.mkreverse())
                 
                 revflow.ackflow = True
@@ -391,6 +392,11 @@ class Router(Node):
                     self.forward(revflow, destnode)
         else:
             self.forward(flowlet, destnode)
+
+
+    def __should_make_acknowledgement_flow(self, flowlet):
+        return self.autoack and flowlet.ipproto == IPPROTO_TCP and (not flowlet.ackflow)
+
 
     def forward(self, flowlet, destnode):
         nextnode = self.nextHop(flowlet.dstaddr)

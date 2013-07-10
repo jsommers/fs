@@ -143,7 +143,8 @@ class PoxBridgeSoftwareSwitch(SoftwareSwitch):
 
 class OpenflowSwitch(Node):
     __slots__ = ['dpid', 'pox_switch', 'controller_name', 'controller_links', 'ipdests', 
-                 'interface_to_port_map', 'trafgen_ip', 'autoack', 'trafgen_mac', 'dstmac_cache']
+                 'interface_to_port_map', 'trafgen_ip', 'autoack', 'trafgen_mac', 'dstmac_cache',
+                 'trace']
 
     def __init__(self, name, measurement_config, **kwargs):
         Node.__init__(self, name, measurement_config, **kwargs)
@@ -154,9 +155,10 @@ class OpenflowSwitch(Node):
         self.pox_switch.set_connection(self)
         self.pox_switch.set_output_packet_callback(self. send_packet)
         self.controller_name = kwargs.get('controller', 'controller')
-        self.autoack = kwargs.get('autoack', False)
+        self.autoack = bool(eval(kwargs.get('autoack', False)))
         self.controller_links = {}
         self.interface_to_port_map = {}
+        self.trace = bool(eval(kwargs.get('trace', False)))
 
         self.ipdests = PyTricia()
         for prefix in kwargs.get('ipdests','').split():
@@ -221,6 +223,12 @@ class OpenflowSwitch(Node):
                         self.logger.debug("Learned MAC/IP mapping {}->{}".format(arp.hwsrc,srcip))
                         # self.logger.debug("Updated {} -> {}".format(portnum, self.ports))
 
+    def __traceit(self, flowlet, pkt, input_port):
+        # total demeter violation :-(
+        tableentry = self.pox_switch.table.entry_for_packet(pkt, input_port)
+        if tableentry is None:
+            tableentry = 'No Match'
+        self.logger.info("Flow table match for flowlet {} (packet {}): {}".format(str(flowlet), str(pkt), tableentry))
 
     def flowlet_arrival(self, flowlet, prevnode, destnode, input_intf=None):
         '''Incoming flowlet: determine whether it's a data plane flowlet or whether it's an OF message
@@ -241,11 +249,17 @@ class OpenflowSwitch(Node):
             else:
                 raise UnhandledPoxPacketFlowletTranslation("Not an openflow message from controller: {}".format(flowlet.ofmsg))
             self.pox_switch.rx_message(self, ofmsg)
+            if self.trace:
+                for i,entry in enumerate(self.pox_switch.table.entries):
+                    actions = '::'.join([repr(a) for a in entry.actions])
+                    self.logger.info("Flow table entry {}: {} (actions: {})".format(i+1, str(entry), actions))
 
         elif isinstance(flowlet, PoxFlowlet):
             self.logger.debug("Received PoxFlowlet: {}".format(str(flowlet.origpkt)))
             input_port = self.interface_to_port_map[input_intf]
             self.process_packet(flowlet.origpkt, input_port)
+            if self.trace:
+                self.__traceit(flowlet, flowlet.origpkt, input_port)
             self.pox_switch.rx_packet(flowlet.origpkt, input_port)
 
         elif isinstance(flowlet, Flowlet):
@@ -270,6 +284,10 @@ class OpenflowSwitch(Node):
 
             pkt = flowlet_to_packet(flowlet)
             pkt.flowlet = None
+
+            if self.trace:
+                self.__traceit(flowlet, pkt, input_port)
+
             self.pox_switch.rx_packet(pkt, input_port)
 
             if self.ipdests.get(flowlet.dstaddr, None):

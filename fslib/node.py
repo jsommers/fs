@@ -21,7 +21,7 @@ from socket import IPPROTO_TCP
 class MeasurementConfig(object):
     __slots__ = ['__counterexport','__exporttype','__exportinterval','__exportfile','__pktsampling','__flowsampling','__maintenance_cycle','__longflowtmo','__flowinactivetmo']
     def __init__(self, **kwargs):
-        self.__counterexport = bool(eval(kwargs.get('counterexport',False)))
+        self.__counterexport = bool(eval(kwargs.get('counterexport','False')))
         self.__exporttype = kwargs.get('flowexport','null')
         self.__exportinterval = int(kwargs.get('counterexportinterval',1))
         self.__exportfile = kwargs.get('counterexportfile',None)
@@ -282,7 +282,7 @@ class Router(Node):
 
     def __init__(self, name, measurement_config, **kwargs): 
         Node.__init__(self, name, measurement_config, **kwargs)
-        self.autoack=bool(eval(kwargs.get('autoack',False)))
+        self.autoack=bool(eval(kwargs.get('autoack','False')))
         self.forwarding_table = PyTricia(32)
         self.default_link = None
 

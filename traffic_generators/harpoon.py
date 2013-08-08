@@ -1,7 +1,7 @@
 from trafgen import TrafficGenerator
 import socket
 import ipaddr
-from fslib.common import fscore
+from fslib.common import fscore, get_logger
 from fslib.flowlet import Flowlet, FlowIdent
 from copy import copy
 from importlib import import_module
@@ -17,6 +17,7 @@ except:
 class HarpoonTrafficGenerator(TrafficGenerator):
     def __init__(self, srcnode, ipsrc='0.0.0.0', ipdst='0.0.0.0', sport=0, dport=0, flowsize=1500, pktsize=1500, flowstart=0, ipproto=socket.IPPROTO_TCP, lossrate=0.001, mss=1460, iptos=0x0, xopen=True, tcpmodel='csa00'):
         TrafficGenerator.__init__(self, srcnode)
+        self.logger = get_logger('fs.harpoon')
         self.srcnet = ipaddr.IPNetwork(ipsrc)
         self.dstnet = ipaddr.IPNetwork(ipdst)
         if haveIPAddrGen:
@@ -79,7 +80,6 @@ class HarpoonTrafficGenerator(TrafficGenerator):
 
     def start(self):
         startt = next(self.flowstartrv)
-        # print >>sys.stderr, 'harpoon node starting up at',startt
         fscore().after(startt, 'harpoon-start'+str(self.srcnode), self.newflow)
 
 
@@ -87,8 +87,6 @@ class HarpoonTrafficGenerator(TrafficGenerator):
         if self.done:
             print 'harpoon generator done'
             return
-
-        # print >>sys.stderr, 'making new harpoon flow at',fscore().now
 
         flet = self.__makeflow()
         self.activeflows[flet.key] = 1
@@ -113,6 +111,7 @@ class HarpoonTrafficGenerator(TrafficGenerator):
         # unclear what to do with raw flows.
         flet.flowstart = 0.0
         flet.flowend = flowduration
+        self.logger.debug("Flow duration: %f" % flowduration)
 
         fscore().after(0.0, 'flowemit-'+str(self.srcnode), self.flowemit, flet, 0, byteemit, destnode)
         
@@ -135,10 +134,6 @@ class HarpoonTrafficGenerator(TrafficGenerator):
         if fsend.pkts * psize < fsend.bytes:
             fsend.pkts += 1
         fsend.bytes += fsend.pkts * 40
-
-        # print 'pkts:',fsend.pkts
-        # print 'psize:',psize
-        # print 'flowlet has %d bytes remaining' % (flowlet.size)
 
         if flowlet.ipproto == socket.IPPROTO_TCP:
             flags = 0x0
@@ -164,6 +159,9 @@ class HarpoonTrafficGenerator(TrafficGenerator):
             fsend.tcpflags = flags
 
         numsent += 1
+
+        self.logger.debug("sending %d bytes %d pkts %s flags; flowlet has %d bytes remaining" % (fsend.bytes, fsend.pkts, fsend.tcpflagsstr, flowlet.size))
+
 
         fscore().topology.node(self.srcnode).flowlet_arrival(fsend, 'harpoon', destnode)
 

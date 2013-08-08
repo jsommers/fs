@@ -43,10 +43,10 @@ There are a number of example configuration files in the `conf/` directory.  To 
 
 To use the OpenFlow extensions (aka fs-sdn), you'll need to clone the POX git repository and point your PYTHONPATH to it.  `fs` currently is only tested with the betta branch (currently default branch) of POX.  Once you've done those things, there are two example configurations in the `conf` folder that should work out-of-the-box:
 
-   $ git clone git://github.com/noxrepo/pox.git ../pox
-   $ export PYTHONPATH=`pwd`/../pox
-   $ python -OO fs.py -t 60 conf/openflow_small_cbr.dot
-   $ python -OO fs.py -t 60 conf/openflow_small_harpoon.dot
+    $ git clone git://github.com/noxrepo/pox.git ../pox
+    $ export PYTHONPATH=`pwd`/../pox
+    $ python -OO fs.py -t 60 conf/openflow_small_cbr.dot
+    $ python -OO fs.py -t 60 conf/openflow_small_harpoon.dot
 
 The first few lines of output from fs when running one of the above example (OpenFlow) configurations should be:
 

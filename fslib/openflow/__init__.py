@@ -7,13 +7,15 @@
 from fslib.common import fscore, get_logger
 from fslib.node import Node
 from importlib import import_module
+
 import pox
-import pox.core 
-import pox.lib
-import pox.lib.recoco as recoco
-import pox.openflow as openflow_component
-from pox.datapaths.switch import SoftwareSwitchBase
+import pox.core
+
+if 'initialize' in dir(pox.core):
+    pox.core.initialize()
+
 from pox.openflow import libopenflow_01 as oflib
+import pox.openflow as openflow_component
 import pox.openflow.of_01 as ofcore
 
 class RuntimeError(Exception):
@@ -118,44 +120,63 @@ def monkey_patch_pox():
     the openflow connection class.  Other overrides are mainly to ensure
     that nothing unexpected happens, but are strictly not necessary at
     present (using betta branch of POX)'''
-    get_logger().debug("Monkeypatching POX for integration with fs")
+    get_logger().info("Monkeypatching POX for integration with fs")
 
     fakerlib = PoxLibPlug()
+    import pox.lib.recoco as recoco
     setattr(recoco, "Timer", FakePoxTimer)
+
+    import pox.lib
     setattr(pox.lib, "ioworker", fakerlib)
     setattr(pox.lib, "pxpcap", fakerlib)
+    setattr(pox.lib, "socketcapture", fakerlib)
+
+    import pox
     setattr(pox, "messenger", fakerlib)
     setattr(pox, "misc", fakerlib)
+
     setattr(ofcore, "Connection", FakeOpenflowConnection)
     setattr(ofcore, "OpenFlow_01_Task", fakerlib)
+
+    import pox.core 
     setattr(pox.core, "getLogger", get_pox_logger)
 
 
 def load_pox_component(name):
     '''Load a pox component by trying to import the named module and
        invoking launch().  Raise a runtime error if something goes wrong.'''
+
+
     log = get_logger()
     try:
         m = import_module(name)
         if 'launch' not in dir(m):
             log.error("Can't load POX module {}".format(name))
-            raise RuntimeError()
+            raise RuntimeError('No launch function in module {}'.format(name))
         else:
             log.debug("Loading POX component {}".format(name))
-            m.launch(m.__dict__)
+
+            # FIXME: component launch needs some rework.
+            # import pox.boot
+            # pox.boot._do_launch([name])
+
+            if m.launch.func_code.co_argcount == 0:
+                m.launch()
+            elif m.launch.func_code.co_argcount >= 1:
+                m.launch(m.__dict__)
+
+            log.debug("Loaded POX component {}".format(name))
+
     except ImportError,e:
         log.error("Error trying to import {} POX component".format(name))
-        raise RuntimeError()
+        raise RuntimeError(str(e))
 
 
 monkey_patch_pox()
 load_pox_component("pox.openflow")
 
+get_logger().debug("Kicking POX Up")
+pox.core.core.goUp()
+get_logger().debug("POX components: {}".format(pox.core.core.components))
+
 from pox_bridge import *
-
-def pox_init():
-    get_logger().debug("Kicking POX up.")
-    pox.core.core.goUp()
-    get_logger().debug("POX components: {}".format(pox.core.core.components))
-
-fscore().after(0.0, "POX up", pox_init)

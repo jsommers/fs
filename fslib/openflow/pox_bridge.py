@@ -5,8 +5,8 @@ import logging
 from ipaddr import IPv4Address
 from struct import pack as spack
 
-from pox.datapaths.switch import SoftwareSwitch
 from pox.openflow import libopenflow_01 as oflib
+from pox.datapaths.switch import SoftwareSwitch
 import pox.lib.packet as pktlib
 from pox.lib.addresses import *
 import pox.openflow.of_01 as ofcore
@@ -53,7 +53,6 @@ def flowlet_to_packet(flowlet):
     etherhdr = pktlib.ethernet()
     etherhdr.src = EthAddr(flowlet.srcmac)
     etherhdr.dst = EthAddr(flowlet.dstmac)
-    # get_logger().debug("MAC xlate: {}->{}, {}->{}".format(flowlet.srcmac, etherhdr.src, flowlet.dstmac, etherhdr.dst))
     etherhdr.type = pktlib.ethernet.IP_TYPE
 
     ipv4 = pktlib.ipv4() 
@@ -134,6 +133,9 @@ def packet_to_flowlet(pkt):
         return flet
 
 class PoxBridgeSoftwareSwitch(SoftwareSwitch):
+    def __init__(self, *args, **kwargs):
+        SoftwareSwitch.__init__(self, *args, **kwargs)
+
     def _output_packet_physical(self, packet, port_num):
         self.forward(packet, port_num)
         SoftwareSwitch._output_packet_physical(self, packet, port_num)
@@ -155,10 +157,10 @@ class OpenflowSwitch(Node):
         self.pox_switch.set_connection(self)
         self.pox_switch.set_output_packet_callback(self. send_packet)
         self.controller_name = kwargs.get('controller', 'controller')
-        self.autoack = bool(eval(kwargs.get('autoack', False)))
+        self.autoack = bool(eval(kwargs.get('autoack', 'False')))
         self.controller_links = {}
         self.interface_to_port_map = {}
-        self.trace = bool(eval(kwargs.get('trace', False)))
+        self.trace = bool(eval(kwargs.get('trace', 'False')))
 
         self.ipdests = PyTricia()
         for prefix in kwargs.get('ipdests','').split():
@@ -228,7 +230,7 @@ class OpenflowSwitch(Node):
         tableentry = self.pox_switch.table.entry_for_packet(pkt, input_port)
         if tableentry is None:
             tableentry = 'No Match'
-        self.logger.info("Flow table match for flowlet {} (packet {}): {}".format(str(flowlet), str(pkt), tableentry))
+        self.logger.info("Flow table match for flowlet {} {} {} (packet {}): {}".format(flowlet.srcmac, flowlet.dstmac, str(flowlet), str(pkt), tableentry))
 
     def flowlet_arrival(self, flowlet, prevnode, destnode, input_intf=None):
         '''Incoming flowlet: determine whether it's a data plane flowlet or whether it's an OF message
@@ -251,7 +253,7 @@ class OpenflowSwitch(Node):
             self.pox_switch.rx_message(self, ofmsg)
             if self.trace:
                 for i,entry in enumerate(self.pox_switch.table.entries):
-                    actions = '::'.join([repr(a) for a in entry.actions])
+                    actions = '::'.join([oflib.ofp_action_type_map[a.type] + ' ' + repr(a) for a in entry.actions])
                     self.logger.info("Flow table entry {}: {} (actions: {})".format(i+1, str(entry), actions))
 
         elif isinstance(flowlet, PoxFlowlet):

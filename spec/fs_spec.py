@@ -5,17 +5,23 @@ from fs import *
 from fslib.common import fscore
 
 class SimTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        SimTests.sim = FsCore(1.0, debug=True, progtick=1.0)
+
     def testNewSimulatorSingleton(self):
-        sim = FsCore(1.0)
-        self.assertIs(fscore(), sim)
+        self.assertIs(fscore(), SimTests.sim)
 
     def testAfter(self):
-        sim = FsCore(1.0, debug=True, progtick=1.0)
         def doafter():
-            self.assertEqual(sim.now, 1.0)
-        sim.after(1.0, "test after", doafter)
-        self.assertEqual(sim.now, 0.0)
-        sim.run(None)
+            self.assertEqual(SimTests.sim.now, 1.0)
+        SimTests.sim.after(1.0, "test after", doafter)
+        self.assertEqual(SimTests.sim.now, 0.0)
+        SimTests.sim.run(None)
+
+    @classmethod
+    def tearDownClass(cls):
+        SimTests.sim.unmonkeypatch()
 
 if __name__ == '__main__':
     unittest.main()

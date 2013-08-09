@@ -6,7 +6,10 @@ import logging
 
 LOG_FORMAT = '%(created)9.4f %(name)-12s %(levelname)-8s %(message)s'
 
+_loginit = False
 def setup_logger(logfile, debug):
+    global _loginit
+    _loginit = True
     loglevel = logging.INFO
     if debug:
         loglevel = logging.DEBUG
@@ -21,20 +24,16 @@ def setup_logger(logfile, debug):
         applog.addHandler(h)
 
 def get_logger(name='fs'):
+    global _loginit
+    if not _loginit:
+        setup_logger(False, False)
     return logging.getLogger(name)
-
-def _fs_monkeypatch(obj):
-    '''monkey patch current time function in time module to give
-    simulation time.'''
-    import time
-    setattr(time, "time", obj.nowfn)
 
 _obj = None
 def set_fscore(obj):
     '''Set the fs core object.  Heaven forgive me for using global.'''
     global _obj
     _obj = obj
-    _fs_monkeypatch(obj)
 
 def fscore():
     '''Get the fs core object'''

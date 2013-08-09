@@ -26,6 +26,7 @@ class FsCore(object):
         if FsCore.inited:
             fscommon.get_logger().warn("Trying to initialize a new simulation object.")
             sys.exit(-1)
+
         FsCore.inited = True
 
         self.__debug = debug
@@ -39,6 +40,7 @@ class FsCore(object):
         self.intr = False
         self.progtick = progtick
         self.__topology = NullTopology()
+        self.monkeypatch()
         fscommon.set_fscore(self)
 
     def progress(self):
@@ -69,6 +71,18 @@ class FsCore(object):
 
     def nowfn(self):
         return self.__now
+
+    def monkeypatch(self):
+        '''monkey patch current time function in time module to give
+        simulation time.'''
+        import time
+        setattr(self, "walltime", time.time)
+        setattr(time, "time", self.nowfn)
+
+    def unmonkeypatch(self):
+        '''Restore time to its regularly scheduled program.'''
+        import time
+        setattr(time, "time", self.walltime)
 
     @property  
     def logger(self):

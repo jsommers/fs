@@ -1,13 +1,13 @@
 import unittest
 from mock import Mock
 
-from fslib.flowlet import FlowIdent, Flowlet, SubtractiveFlowlet, OpenflowMessage, ofp_match_from_flowlet
-from pox.openflow.flow_table import SwitchFlowTable, TableEntry
-import pox.openflow.libopenflow_01 as poxof
-from node import *
-import ipaddr
-import time
-import copy
+#from fslib.flowlet import FlowIdent, Flowlet, SubtractiveFlowlet, OpenflowMessage, ofp_match_from_flowlet
+#from pox.openflow.flow_table import SwitchFlowTable, TableEntry
+#import pox.openflow.libopenflow_01 as poxof
+#from node import *
+#import ipaddr
+#import time
+#import copy
 
 class TestOfSwitch(unittest.TestCase):
     def setUp(self):
@@ -140,4 +140,5 @@ class TestOfSwitch(unittest.TestCase):
         self.linkobj.flowlet_arrival.assert_called_once()
 
 if __name__ == '__main__':
-    unittest.main()
+    # unittest.main()
+    raise Exception("Test cases out of date.")

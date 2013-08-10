@@ -1,10 +1,11 @@
 import unittest
 from mock import Mock
 
+from spec_base import FsTestBase
 from fs import *
 from fslib.common import fscore
 
-class SimTests(unittest.TestCase):
+class SimTests(FsTestBase):
     @classmethod
     def setUpClass(cls):
         SimTests.sim = FsCore(1.0, debug=True, progtick=1.0)

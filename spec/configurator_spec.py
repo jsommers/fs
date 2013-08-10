@@ -1,6 +1,7 @@
 import unittest
 from mock import Mock
 import tempfile
+from spec_base import FsTestBase
 import fslib.configurator as configurator
 import fslib.common as fscommon
 import os
@@ -143,12 +144,7 @@ json_conf2 = '''
 
 '''
 
-class ConfiguratorTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        '''Set up logging; turn on debug messages'''
-        fscommon.setup_logger(None, True)
-
+class ConfiguratorTests(FsTestBase):
     def setUp(self):
         fh = open("/tmp/filesizes.txt", "w")
         fh.write("100 200 300 400 500\n600 700 800 900 1000\n")

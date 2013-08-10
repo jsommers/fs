@@ -2,6 +2,7 @@ import unittest
 from mock import Mock
 import tempfile
 import fslib.configurator as configurator
+import fslib.common as fscommon
 import os
 
 # dry out configuration stuff
@@ -143,6 +144,11 @@ json_conf2 = '''
 '''
 
 class ConfiguratorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        '''Set up logging; turn on debug messages'''
+        fscommon.setup_logger(None, True)
+
     def setUp(self):
         fh = open("/tmp/filesizes.txt", "w")
         fh.write("100 200 300 400 500\n600 700 800 900 1000\n")
@@ -162,21 +168,21 @@ class ConfiguratorTests(unittest.TestCase):
 
     def testReadConfigDot(self):
         self.mkconfig(dot_conf1)
-        cfg = configurator.FsConfigurator(debug=True)
+        cfg = configurator.FsConfigurator()
         topology = cfg.load_config(self.cfgfname, configtype="dot")
         self.assertItemsEqual(topology.nodes.keys(), ['a','b'])
         self.assertItemsEqual(topology.links.keys(), [('a','b'),('b','a')])
 
     def testReadConfigJson1(self):
         self.mkconfig(json_conf1)
-        cfg = configurator.FsConfigurator(debug=True)
+        cfg = configurator.FsConfigurator()
         topology = cfg.load_config(self.cfgfname, configtype="json")
         self.assertItemsEqual(topology.nodes.keys(), ['a','b'])
         self.assertItemsEqual(topology.links.keys(), [('a','b'),('b','a')])
 
     def testReadConfigJson2(self):
         self.mkconfig(json_conf2)
-        cfg = configurator.FsConfigurator(debug=True)
+        cfg = configurator.FsConfigurator()
         topology = cfg.load_config(self.cfgfname, configtype="json")
         self.assertItemsEqual(topology.nodes.keys(), ['a','b'])
         self.assertItemsEqual(topology.links.keys(), [('a','b'),('b','a')])

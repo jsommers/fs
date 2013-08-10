@@ -7,7 +7,7 @@ import logging
 LOG_FORMAT = '%(created)9.4f %(name)-12s %(levelname)-8s %(message)s'
 
 _loginit = False
-def setup_logger(logfile, debug):
+def setup_logger(logfile=None, debug=False):
     global _loginit
     _loginit = True
     loglevel = logging.INFO
@@ -26,7 +26,7 @@ def setup_logger(logfile, debug):
 def get_logger(name='fs'):
     global _loginit
     if not _loginit:
-        setup_logger(False, False)
+        setup_logger(None, False)
     return logging.getLogger(name)
 
 _obj = None

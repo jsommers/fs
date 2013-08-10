@@ -1,15 +1,17 @@
 import unittest
 from mock import MagicMock, Mock
 
-from fslib.flowlet import FlowIdent, Flowlet, SubtractiveFlowlet, OpenflowMessage
+from spec_base import FsTestBase
+
+from fslib.flowlet import FlowIdent, Flowlet, SubtractiveFlowlet
 import ipaddr
 import time
 import copy
 
 
-class TestFlowlet(unittest.TestCase):
+class TestFlowlet(FsTestBase):
     def setUp(self):
-        self.ident1 = FlowIdent(srcip="1.1.1.1",dstip="2.2.2.2",ipproto=6, dport=80, sport=10000, srcmac="00:00:00:00:00:01", dstmac="00:00:00:00:00:02",vlan=1)
+        self.ident1 = FlowIdent(srcip="1.1.1.1",dstip="2.2.2.2",ipproto=6, dport=80, sport=10000)
         self.ident2 = FlowIdent(str(ipaddr.IPAddress('10.0.1.1')), str(ipaddr.IPAddress('192.168.5.2')), 17, 5, 42)
 
     def testFlowIdent(self):
@@ -17,10 +19,10 @@ class TestFlowlet(unittest.TestCase):
         self.assertEqual(self.ident2.key, ftfwd2.key)
 
     def testBuildFlowlet(self):
-        f1 = Flowlet(self.ident2)
+        f1 = Flowlet(self.ident1)
         f1.flowstart = time.time()
         f1.flowend = time.time() + 10
-        self.assertEqual(f1.key, ('10.0.1.1','192.168.5.2',17,5,42,0,0,0))
+        self.assertEqual(repr(f1.key), repr(self.ident1))
 
     def testCopy(self):
         # NB: shallow copy of f1; flow key will be identical
@@ -47,9 +49,6 @@ class TestFlowlet(unittest.TestCase):
         f1 = SubtractiveFlowlet(self.ident1, "removeuniform(0.001)")
         # need to do some mocking to test action
 
-    def testOpenflowPacketOut(self):
-        f1 = OpenflowMessage(self.ident1, 'ofp_packet_out')
-        # some mocking to test 
 
 if __name__ == '__main__':
     unittest.main()

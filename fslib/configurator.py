@@ -118,7 +118,12 @@ class Topology(NullTopology):
                     if nodename not in lpmnode['dests']:
                         routes = self.routing[nodename]
                         for d in lpmnode['dests']:
-                            path = routes[d]
+                            try:
+                                path = routes[d]
+                            except KeyError:
+                                self.logger.warn("No route from {} to {}".format(nodename, d)) 
+                                continue
+                                
                             nexthop = path[1]
                             nodeobj.addForwardingEntry(prefix, nexthop)
                 
@@ -176,7 +181,7 @@ class Topology(NullTopology):
         '''revive a link & recompute routing '''
         self.logger.info('Link recovered %s - %s' % (a,b))
         self.graph.add_edge(a,b,weight=edict.get('weight',1),delay=edict.get('delay',0),capacity=edict.get('capacity',1000000))
-        FsConfigurator.configure_routing(self.routing, self.graph)
+        self.__configure_routing()
 
         downtime = None
         try:

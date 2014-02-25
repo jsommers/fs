@@ -336,18 +336,9 @@ class Router(Node):
         if isinstance(flowlet, SubtractiveFlowlet):
             killlist = []
             ok = []
-            for k,flet in self.flow_table.iteritems():
-                # FIXME --- no flow_table
-                if next(flowlet.action) and (not flowlet.srcaddr or flet.srcaddr in flowlet.srcaddr) and (not flowlet.dstaddr or flet.dstaddr in flowlet.dstaddr) and (not flowlet.ipproto or flet.ipproto == flowlet.ipproto):
-                    killlist.append(k)
-                else:
-                    ok.append(k)
-            for kkey in killlist:
-                del self.flow_table[kkey]
-
+            self.unmeasure_flow(flowlet, prevnode)
             if destnode != self.name:
                 self.forward(flowlet, destnode)
-
             return
 
         # a "normal" Flowlet object

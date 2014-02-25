@@ -12,7 +12,7 @@ graph test {
         // build up and withdrawal of harpoon sources; 10 sources for duration
         // of 60 sec, followed by 20 sources for 60 sec, etc.
         m1="modulator start=0.0 generator=s1 profile=((60,),(10,20,30,30,20,10))"
-        s1="harpoon ipsrc=10.2.0.0/16 ipdst=10.3.1.0/24 flowsize=pareto(5000,1.2) flowstart=exponential(1/2.0) pktsize=normal(1000,200) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomuniffloat(0.005,0.01) mss=randomchoice(1500,576,1500) emitprocess=normal(x,x*0.1) iptos=randomchoice(0x0,0x10,0x08,0x04,0x02)"
+        s1="harpoon ipsrc=10.2.0.0/16 ipdst=10.3.1.0/24 flowsize=pareto(5000,1.2) flowstart=exponential(1/2.0) pktsize=normal(1000,200) ipproto=randomchoice(6) sport=randomchoice(22,80,443) dport=randomunifint(1025,65535) lossrate=randomuniffloat(0.005,0.01) mss=randomchoice(1500,576,1500) iptos=randomchoice(0x0,0x10,0x08,0x04,0x02)"
 
         // very short flows 
         // immediate onset/withdrawal, one source started at exponential intervals (mean 1 sec) starting at 

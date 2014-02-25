@@ -1,5 +1,7 @@
 from trafgen import TrafficGenerator
+from fslib.flowlet import SubtractiveFlowlet,FlowIdent
 from fslib.common import fscore
+from fslib.util import *
 
 class SubtractiveTrafficGenerator(TrafficGenerator):
     def __init__(self, srcnode, dstnode=None, action=None, ipdstfilt=None,
@@ -32,4 +34,4 @@ class SubtractiveTrafficGenerator(TrafficGenerator):
         # at end, set done to True
         f = SubtractiveFlowlet(FlowIdent(self.ipsrcfilt, self.ipdstfilt, ipproto=self.ipprotofilt), action=self.action)
         self.logger.info('Subtractive generator callback')
-        fscore().node(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode)
+        fscore().topology.node(self.srcnode).flowlet_arrival(f, 'subtractor', self.dstnode)

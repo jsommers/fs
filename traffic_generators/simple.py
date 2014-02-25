@@ -4,6 +4,8 @@ from ipaddr import IPAddress, IPNetwork
 from socket import IPPROTO_UDP, IPPROTO_TCP, IPPROTO_ICMP
 from fslib.flowlet import Flowlet, FlowIdent
 from fslib.common import fscore
+import copy
+import re
 
 
 # FIXME
@@ -259,4 +261,8 @@ class SimpleTrafficGenerator(TrafficGenerator):
             fscore().after(xinterval, "rawflow-cb-".format(self.srcnode), self.callback)
         else:
             self.done = True
+
+
+# rawflow -> alias for simple
+RawflowTrafficGenerator = SimpleTrafficGenerator
 

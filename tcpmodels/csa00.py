@@ -1,7 +1,7 @@
 from random import choice
 from math import log, floor, ceil, sqrt
 
-def model(bytes, mss, rtt, interval, p):
+def model(bytes, mss, rtt, interval, p, rwnd=1048576):
     '''Implements the cardwell, savage, anderson infocom 2000 improvement on pftk98.'''
 
     # assume losspr is same in forward and reverse direction
@@ -13,9 +13,8 @@ def model(bytes, mss, rtt, interval, p):
     initial_window = choice([1,2,3])
 
     gamma = 1.5
-    wmax = 2**20 / mss
+    wmax = rwnd / mss  # receive window, in MSS
     # print 'wmax:',wmax
-
 
     # eq(4): expected handshake time
     elh = rtt + ts * ( (1.0-pr) / (1-2.0*pr) + (1.0 - pf) / (1 - 2*pf) - 2.0)

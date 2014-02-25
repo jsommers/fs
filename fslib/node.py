@@ -337,6 +337,7 @@ class Router(Node):
             killlist = []
             ok = []
             for k,flet in self.flow_table.iteritems():
+                # FIXME --- no flow_table
                 if next(flowlet.action) and (not flowlet.srcaddr or flet.srcaddr in flowlet.srcaddr) and (not flowlet.dstaddr or flet.dstaddr in flowlet.dstaddr) and (not flowlet.ipproto or flet.ipproto == flowlet.ipproto):
                     killlist.append(k)
                 else:

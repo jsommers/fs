@@ -14,6 +14,8 @@ from fslib.link import Link
 from fslib.common import get_logger
 from fslib.traffic import FlowEventGenModulator
 import fslib.util as fsutil
+from fslib.util import *
+from fslib.common import fscore
 
 from networkx import single_source_dijkstra_path, single_source_dijkstra_path_length, read_gml, read_dot
 from networkx.readwrite import json_graph
@@ -86,7 +88,7 @@ class Topology(NullTopology):
         if ttf or ttr:
             assert(ttf and ttr)
             xttf = next(ttf)
-            self.after(xttf, 'link-failure-'+a+'-'+b, self.__linkdown, a, b, edict, ttf, ttr)
+            fscore().after(xttf, 'link-failure-'+a+'-'+b, self.__linkdown, a, b, edict, ttf, ttr)
 
     def __configure_routing(self):
         for n in self.graph:
@@ -167,7 +169,7 @@ class Topology(NullTopology):
             self.logger.info('Link %s-%s permanently taken down (no recovery time remains in generator)' % (a, b))
             return
         else:
-            self.after(uptime, 'link-recovery-'+a+'-'+b, self.__linkup, a, b, edict, ttf, ttr)
+            fscore().after(uptime, 'link-recovery-'+a+'-'+b, self.__linkup, a, b, edict, ttf, ttr)
 
         
     def __linkup(self, a, b, edict, ttf, ttr):
@@ -183,7 +185,7 @@ class Topology(NullTopology):
             self.logger.info('Link %s-%s permanently going into service (no failure time remains in generator)' % (a, b))
             return
         else:
-            self.after(downtime, 'link-failure-'+a+'-'+b, self.__linkdown, a, b, edict, ttf, ttr)
+            fscore().after(downtime, 'link-failure-'+a+'-'+b, self.__linkdown, a, b, edict, ttf, ttr)
 
 
     def owd(self, a, b):
@@ -502,7 +504,7 @@ class FsConfigurator(object):
             moddict[k] = v
 
         self.logger.debug("inside config_traf_mod: {}".format(moddict))
-        if not 'profile' in moddict or 'sustain' in moddict:
+        if not ('profile' in moddict or 'sustain' in moddict):
             self.logger.warn("Need a 'profile' or 'sustain' in traffic specification for {}".format(moddict))
             raise InvalidTrafficSpecification(moddict)
 

@@ -46,20 +46,20 @@ class Link(object):
         if isinstance(capacity, (int,float)):
             return float(capacity)
         elif isinstance(capacity, (str, unicode)):
-            if re.match('^(\d+)$', capacity):
+            if re.match('^(\d+\.?\d*)$', capacity):
                 return float(capacity)
             # [kK]+anything assumed to be kbit/sec
-            mobj = re.match('^(\d+)[kK]', capacity)
+            mobj = re.match('^(\d+\.?\d*)[kK]', capacity)
             if mobj:
                 return float(mobj.groups()[0]) * 1000.0
 
             # [mM]+anything assumed to be mbit/sec
-            mobj = re.match('^(\d+)[mM]', capacity)
+            mobj = re.match('^(\d+\.?\d*)[mM]', capacity)
             if mobj:
                 return float(mobj.groups()[0]) * 1000000.0
 
             # [gG]+anything assumed to be gbit/sec
-            mobj = re.match('^(\d+)[gG]', capacity)
+            mobj = re.match('^(\d+\.?\d*)[gG]', capacity)
             if mobj:
                 return float(mobj.groups()[0]) * 1000000000.0
 

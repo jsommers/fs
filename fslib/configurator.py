@@ -204,17 +204,17 @@ class Topology(NullTopology):
 
     def delay(self, a, b):
         '''get the link delay between a and b '''
-        d = self.graph[a][b]
-        if d and 0 in d:
-            return d[0]['delay']
+        d = self.graph.edge[a][b]
+        if d is not None:
+            return d.values()[0]['delay']
         return None
 
         
     def capacity(self, a, b):
         '''get the bandwidth between a and b '''
-        d = self.graph[a][b]
-        if d and 0 in d:
-            return d[0]['capacity']
+        d = self.graph.edge[a][b]
+        if d is not None:
+            return d.values()[0]['capacity']
         return None
         
     def nexthop(self, node, dest):
@@ -449,12 +449,12 @@ class FsConfigurator(object):
             
             # parse link delay/capacity values and substitute back into
             # networkx graph to ensure that no additional parsing is needed
-            delay = self.graph[a][b][0].get('delay',0)
+            delay = d.get('delay',0)
             delay = Link.parse_delay(delay)
-            cap = self.graph[a][b][0].get('capacity',0)
+            cap = d.get('capacity',0)
             cap = Link.parse_capacity(cap)
-            self.graph[a][b][0]['capacity'] = cap
-            self.graph[a][b][0]['delay'] = delay
+            d['capacity'] = cap
+            d['delay'] = delay
 
             ipa,ipb = [ ip for ip in next(FsConfigurator.link_subnetter).iterhosts() ]
 

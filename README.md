@@ -6,10 +6,10 @@ TCP throughput models to drive the simulation.
 
 FS is made available under terms of the GPLv2.
 
-Note: the originally released version of fs (as described in the INFOCOM '11)
-research paper is on branch fs-orig.  The master branch is completely revamped
-and includes the fs-sdn code as described in a forthcoming HotSDN paper (fs-sdn).
-
+Note: the originally released version of fs as described in an
+INFOCOM '11 research paper (see http://dx.doi.org/10.1109/INFCOM.2011.5935055)
+is on branch fs-orig.  The master branch is completely revamped
+and includes the fs-sdn code as described in a HotSDN '13 paper (http://dl.acm.org/citation.cfm?id=2491202).
 
 ## Running fs
 

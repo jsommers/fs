@@ -17,7 +17,8 @@ import fslib.util as fsutil
 from fslib.util import *
 from fslib.common import fscore
 
-from networkx import single_source_dijkstra_path, single_source_dijkstra_path_length, read_gml, read_dot
+from networkx import single_source_dijkstra_path, single_source_dijkstra_path_length, read_gml
+from networkx.drawing.nx_pydot import read_dot
 from networkx.readwrite import json_graph
 
 
